@@ -40,6 +40,15 @@ export interface ClusterIn {
   context: string
 }
 
+/** Body of PUT /api/v1/clusters/<id> — `kubeconfig` is omitted to keep the
+ *  stored encrypted document (4.1 `settings/cluster-config` parity). */
+export interface ClusterUpdateIn {
+  name: string
+  api_server: string
+  context: string
+  kubeconfig?: string
+}
+
 export interface Health {
   status: string
 }

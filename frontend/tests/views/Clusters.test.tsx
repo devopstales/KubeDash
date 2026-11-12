@@ -1,39 +1,154 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeAll, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { server } from '../msw'
 import { http, HttpResponse } from 'msw'
 import ClustersView from '../../src/views/Clusters'
 
-describe('ClustersView', () => {
-  beforeEach(() =>
-    server.use(
-      http.get('*/api/v1/clusters', () =>
-        HttpResponse.json({
-          items: [
-            {
-              id: 1,
-              name: 'prod',
-              api_server: 'https://prod.example',
-              context: 'prod-ctx',
-              status: 'up',
-            },
-          ],
-        }),
-      ),
+const KUBECONFIG = 'apiVersion: v1\nkind: Config\n'
+
+const renderClusters = () =>
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={['/clusters']}>
+        <ClustersView />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+
+const mockList = (role = 'admin') =>
+  server.use(
+    http.get('*/api/v1/auth/me', () =>
+      HttpResponse.json({
+        sub: `${role}-sub`,
+        email: `${role}@example.com`,
+        display_name: role,
+        groups: [],
+        role,
+        auth_source: 'oidc',
+        kubeconfig_source: null,
+        last_login_at: null,
+      }),
+    ),
+    http.get('*/api/v1/clusters', () =>
+      HttpResponse.json({
+        items: [
+          {
+            id: 1,
+            name: 'prod',
+            api_server: 'https://prod.example',
+            context: 'prod-ctx',
+            status: 'up',
+          },
+        ],
+      }),
     ),
   )
 
-  test('lists bound clusters from the API', async () => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    render(
-      <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={['/clusters']}>
-          <ClustersView />
-        </MemoryRouter>
-      </QueryClientProvider>,
+beforeEach(() => {
+  mockList()
+})
+
+afterEach(() => {
+  localStorage.clear()
+  vi.restoreAllMocks()
+})
+
+describe('ClustersView', () => {
+  test('lists bound clusters with the 4.1 Context/URL/Action columns', async () => {
+    renderClusters()
+    expect(await screen.findByText('prod-ctx')).toBeTruthy()
+    for (const title of ['Context', 'URL', 'Action']) {
+      expect(screen.getByRole('columnheader', { name: title })).toBeTruthy()
+    }
+    expect(screen.getByText('https://prod.example')).toBeTruthy()
+  })
+
+  test('admin creates a cluster from the add dialog', async () => {
+    const user = userEvent.setup()
+    const posted = vi.fn()
+    server.use(
+      http.post('*/api/v1/clusters', async ({ request }) => {
+        posted(await request.json())
+        return HttpResponse.json({ id: 2, name: 'staging' }, { status: 201 })
+      }),
     )
-    expect(await screen.findByText('prod')).toBeTruthy()
+    renderClusters()
+    expect(await screen.findByText('prod-ctx')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /add cluster/i }))
+    await user.click(screen.getByLabelText(/^name$/i))
+    await user.paste('staging')
+    await user.click(screen.getByLabelText(/config context/i))
+    await user.paste('staging-ctx')
+    await user.click(screen.getByLabelText(/api url/i))
+    await user.paste('https://staging.example')
+    await user.click(screen.getByLabelText(/kubeconfig/i))
+    await user.paste(KUBECONFIG)
+    const buttons = screen.getAllByRole('button', { name: /^add cluster$/i })
+    await user.click(buttons[buttons.length - 1])
+    await waitFor(() =>
+      expect(posted).toHaveBeenCalledWith({
+        name: 'staging',
+        api_server: 'https://staging.example',
+        context: 'staging-ctx',
+        kubeconfig: KUBECONFIG,
+      }),
+    )
+  })
+
+  test('admin edits a cluster without resending the stored kubeconfig', async () => {
+    const user = userEvent.setup()
+    const updated = vi.fn()
+    server.use(
+      http.put('*/api/v1/clusters/1', async ({ request }) => {
+        updated(await request.json())
+        return HttpResponse.json({ id: 1, name: 'prod', status: 'up' })
+      }),
+    )
+    renderClusters()
+    await user.click(await screen.findByRole('button', { name: /edit prod/i }))
+    const url = screen.getByLabelText(/api url/i)
+    await user.clear(url)
+    await user.click(url)
+    await user.paste('https://prod2.example')
+    const buttons = screen.getAllByRole('button', { name: /^update cluster$/i })
+    await user.click(buttons[buttons.length - 1])
+    await waitFor(() =>
+      expect(updated).toHaveBeenCalledWith({
+        name: 'prod',
+        api_server: 'https://prod2.example',
+        context: 'prod-ctx',
+      }),
+    )
+  })
+
+  test('admin deletes a cluster after confirmation', async () => {
+    const user = userEvent.setup()
+    const deleted = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    server.use(http.delete('*/api/v1/clusters/1', () => (deleted(), HttpResponse.json({}))))
+    renderClusters()
+    await user.click(await screen.findByRole('button', { name: /delete prod/i }))
+    await waitFor(() => expect(deleted).toHaveBeenCalled())
+    expect(vi.mocked(window.confirm).mock.calls[0][0]).toContain('prod')
+  })
+
+  test('non-admin sees the list without mutation controls', async () => {
+    mockList('user')
+    renderClusters()
+    expect(await screen.findByText('prod-ctx')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /add cluster/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /edit prod/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /delete prod/i })).toBeNull()
+  })
+
+  test('empty registry renders 4.1 empty text', async () => {
+    server.use(http.get('*/api/v1/clusters', () => HttpResponse.json({ items: [] })))
+    renderClusters()
+    expect(await screen.findByText('No cluster configurations found')).toBeTruthy()
   })
 })

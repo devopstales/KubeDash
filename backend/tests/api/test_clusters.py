@@ -184,6 +184,136 @@ def test_get_unbound_cluster_404(api_client, auth_client, api_app) -> None:
     assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
 
 
+def test_update_keeps_stored_kubeconfig(api_app, api_client, auth_client) -> None:
+    """4.1 `settings/cluster-config` parity: an update without a kubeconfig
+    keeps the stored ciphertext (the edit form leaves it blank)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    assert _register(api_client, h).status_code in (200, 201)
+    with api_app.app_context():
+        from app.extensions import db
+        from app.models.cluster import Cluster
+
+        original_enc = db.session.get(Cluster, 1).kubeconfig_enc
+    r = api_client.put(
+        "/api/v1/clusters/1",
+        json={"name": "prod-renamed", "api_server": "https://5.6.7.8:6443", "context": "ctx-2"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body["name"] == "prod-renamed"
+    assert body["api_server"] == "https://5.6.7.8:6443"
+    assert body["context"] == "ctx-2"
+    with api_app.app_context():
+        from app.extensions import db
+        from app.models.cluster import Cluster
+
+        row = db.session.get(Cluster, 1)
+        assert row.name == "prod-renamed"
+        assert row.kubeconfig_enc == original_enc
+
+
+def test_update_with_kubeconfig_reencrypts(api_app, api_client, auth_client) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    assert _register(api_client, h).status_code in (200, 201)
+    rotated = KUBECONFIG.replace("https://1.2.3.4:6443", "https://9.9.9.9:6443")
+    r = api_client.put(
+        "/api/v1/clusters/1",
+        json={
+            "name": "prod",
+            "api_server": "https://9.9.9.9:6443",
+            "context": "prod",
+            "kubeconfig": rotated,
+        },
+        headers=h,
+    )
+    assert r.status_code == 200, r.get_json()
+    with api_app.app_context():
+        from app.extensions import db
+        from app.models.cluster import Cluster
+        from app.services.k8s_client import decrypt_kubeconfig
+
+        row = db.session.get(Cluster, 1)
+        assert b"apiVersion" not in row.kubeconfig_enc
+        assert decrypt_kubeconfig(row.kubeconfig_enc) == rotated.encode()
+
+
+def test_update_duplicate_name_409(api_client, auth_client) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    assert _register(api_client, h, name="one").status_code in (200, 201)
+    assert _register(api_client, h, name="two").status_code in (200, 201)
+    r = api_client.put(
+        "/api/v1/clusters/1",
+        json={"name": "two", "api_server": "https://1.2.3.4:6443", "context": "one"},
+        headers=h,
+    )
+    assert r.status_code == 409
+    assert r.get_json()["error"]["code"] == "CLUSTER_ALREADY_EXISTS"
+
+
+def test_update_invalid_kubeconfig_422(api_client, auth_client) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    assert _register(api_client, h).status_code in (200, 201)
+    r = api_client.put(
+        "/api/v1/clusters/1",
+        json={
+            "name": "prod",
+            "api_server": "https://1.2.3.4:6443",
+            "context": "prod",
+            "kubeconfig": "::not-yaml",
+        },
+        headers=h,
+    )
+    assert r.status_code == 422
+    assert r.get_json()["error"]["code"] == "INVALID_KUBECONFIG"
+
+
+def test_update_denied_for_non_admin_binding(api_app, api_client, auth_client) -> None:
+    """Delete/update gate: a bound viewer is not a cluster admin."""
+    auth_client.login()
+    assert _register(api_client, {"Authorization": f"Bearer {auth_client.jwt}"}).status_code in (
+        200,
+        201,
+    )
+    from app.core.security import issue_token_pair
+    from app.extensions import db
+    from app.models.binding import ClusterBinding
+    from app.models.cluster import Cluster
+    from app.models.user import User
+
+    with api_app.app_context():
+        cluster = db.session.get(Cluster, 1)
+        viewer = User(sub="viewer", email="v@example.com")
+        db.session.add(viewer)
+        db.session.flush()
+        db.session.add(ClusterBinding(user_id=viewer.id, cluster_id=cluster.id, role="viewer"))
+        db.session.commit()
+        access, _ = issue_token_pair(viewer)
+    r = api_client.put(
+        "/api/v1/clusters/1",
+        json={"name": "prod", "api_server": "https://1.2.3.4:6443", "context": "prod"},
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+
+
+def test_update_local_cluster_404(api_client, auth_client) -> None:
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.put(
+        "/api/v1/clusters/0",
+        json={"name": "local", "api_server": "local", "context": "local"},
+        headers=h,
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
 def test_health_up_with_fake_k8s(api_client, auth_client, fake_k8s) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}

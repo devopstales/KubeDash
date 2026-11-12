@@ -57,6 +57,7 @@ export function useCluster() {
   return {
     clusters: clustersQuery.data ?? [],
     clustersLoading: clustersQuery.isLoading,
+    clustersError: clustersQuery.error,
     me: meQuery.data ?? null,
     permissions: meQuery.data?.groups ?? [],
     role: meQuery.data?.role ?? null,

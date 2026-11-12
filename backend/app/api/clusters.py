@@ -22,7 +22,7 @@ from app.core.errors import (
 from app.extensions import db
 from app.models.binding import ClusterBinding
 from app.models.cluster import Cluster
-from app.schemas.cluster import ClusterIn, ClusterOut, HealthOut
+from app.schemas.cluster import ClusterIn, ClusterOut, ClusterUpdate, HealthOut
 from app.services import k8s_client as kc
 from app.services.k8s_client import (
     LOCAL_CLUSTER_ID,
@@ -200,6 +200,65 @@ class ClusterApi(Api):
             kc.pool.get(_local_cluster())
             return _out(_local_cluster())
         cluster = bound_cluster_or_404(g.current_user, cluster_id)
+        return _out(cluster)
+
+    @blp.route("/clusters/<int:cluster_id>", methods=["PUT"])
+    @blp.arguments(ClusterUpdate)
+    @blp.response(200, ClusterOut)
+    @blp.doc(
+        responses={
+            403: "RBAC_DENIED",
+            404: "CLUSTER_NOT_FOUND",
+            409: "CLUSTER_ALREADY_EXISTS",
+            422: "INVALID_KUBECONFIG",
+        }
+    )
+    def update_cluster(self, args: dict[str, object], cluster_id: int) -> dict[str, object]:
+        """Update a registered cluster (4.1 `settings/cluster-config` parity).
+
+        The synthetic local cluster (id 0) is not a registry row and is not
+        editable. Same gate as delete: platform admin or the cluster's
+        registering admin (binding role == "admin"). ``kubeconfig`` omitted
+        or empty keeps the stored ciphertext; a supplied document is
+        validated before ANY field is written.
+        """
+        if cluster_id == LOCAL_CLUSTER_ID:
+            raise ClusterNotFoundError("synthetic local cluster is not editable")
+        cluster = bound_cluster_or_404(g.current_user, cluster_id)
+        user = g.current_user
+        is_platform_admin = user.role == "admin"
+        is_cluster_admin = (
+            db.session.execute(
+                db.select(ClusterBinding).filter_by(
+                    user_id=user.id, cluster_id=cluster.id, role="admin"
+                )
+            )
+            .scalar_one_or_none()
+            is not None
+        )
+        if not (is_platform_admin or is_cluster_admin):
+            raise RbacDeniedError("only the cluster admin or a platform admin can update")
+        name = str(args["name"])
+        duplicate = db.session.execute(
+            db.select(Cluster).filter(Cluster.name == name, Cluster.id != cluster.id)
+        ).scalar_one_or_none()
+        if duplicate is not None:
+            raise ClusterAlreadyExistsError(f"cluster {name!r} already exists")
+        kubeconfig = args.get("kubeconfig")
+        if kubeconfig:
+            try:
+                doc = yaml.safe_load(str(kubeconfig))
+            except yaml.YAMLError as e:
+                raise InvalidKubeconfigError("kubeconfig is not valid YAML") from e
+            if not isinstance(doc, dict):
+                raise InvalidKubeconfigError("kubeconfig must be a YAML mapping")
+        # Validation passed: apply every field in one commit (no partial row).
+        cluster.name = name
+        cluster.api_server = str(args["api_server"])
+        cluster.context = str(args["context"])
+        if kubeconfig:
+            cluster.kubeconfig_enc = encrypt_kubeconfig(str(kubeconfig).encode())
+        db.session.commit()
         return _out(cluster)
 
     @blp.route("/clusters/<int:cluster_id>", methods=["DELETE"])
