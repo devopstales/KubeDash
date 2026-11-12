@@ -132,7 +132,12 @@ changes:
     # "3", click→detail at clean URL, data table + JSON block). 1 WARNING
     # out-of-scope (W037: the ha-status /clusters WIP breaks the full
     # `task e2e` serial chain), 2 SUGGESTION (W038 blueprint file-list
-    # drift, W039 no execution ledger). Next: requesting-code-review.
+    # drift, W039 no execution ledger). Re-verified 2026-11-12 at
+    # cc32ab72 (15 commits of drift: ha-status code committed, 4
+    # ship/archive commits, .skillgrid restore): configmap code
+    # byte-identical since the gate; floor + e2e leg re-run green;
+    # W037 re-confirmed open (ha-status gate pending); PASS unchanged.
+    # Next: requesting-code-review.
   2026-11-06-mcp-server:
     phase: research
     status: in_progress

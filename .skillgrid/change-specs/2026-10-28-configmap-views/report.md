@@ -12,7 +12,10 @@ configured).
 **Tree note:** gate ran at tip `ebf93a5f` + uncommitted
 `2026-11-10-ha-status-page` WIP (clusters.py / Clusters views + tests /
 useCluster.ts / types.ts / ClusterStatus) — that WIP is a separate change
-and is named wherever it intersects this gate's evidence.
+and is named wherever it intersects this gate's evidence. **Re-verified
+2026-11-12 at tip `cc32ab72`** after 15 commits of drift (the ha-status
+code committed, 4 ship/archive commits, the `.skillgrid` restore, tracker
+moves) — see `## Re-verification` below; verdict unchanged.
 
 ## Test Plan
 
@@ -234,6 +237,48 @@ Out-of-scope intersections (named, not scope gaps): the uncommitted
 ha-status WIP (its Clusters test failure + the e2e /clusters expectation)
 and the pre-existing lint debt in other kinds' files.
 
+## Re-verification 2026-11-12 (tree drift `ebf93a5f` → `cc32ab72`)
+
+The tree advanced 15 commits after the gate (re-verification mode:
+regression-only on the all-passing gate — the floor re-executed at the
+current tip; the goal-backward evidence stands on unchanged code).
+
+**Drift inventory:** `959a3833` + `b2330f69` (ha-status code committed —
+the `/clusters` 4.1-parity rewrite + cluster-status cards, the W037 WIP is
+now in-tree), `d6bf3c4f` (this gate's own comment-only fix committed),
+`68b11cb9` (this gate's report/WINDOWS/state commit), `0360044d` +
+`5f8d9c61` (runtimeclass review fix/record), `ad42c4a4` / `6e4504d3` /
+`28c9e594` / `c40626a9` (pv/runtimeclass/storageclass/pvc ship + archive),
+`482d2f46` + `7f249163` (`.skillgrid` restore into the new layout),
+`6d3150d3` + `055f7ffb` (tracker final summaries), `cc32ab72` (tracker
+moved to the vault — no backend/frontend files).
+
+**ConfigMap code unchanged since the gate:** `git diff ebf93a5f..HEAD`
+over the change's file set touches exactly one file —
+`frontend/tests/views/configmap_data.test.tsx` (2+/2-, `d6bf3c4f`, the
+gate's own stale-comment fix). All production code (service methods,
+generic-route wiring, both views, App.tsx, Stub routes, demo fixture) is
+byte-identical — the gate's live API + browser evidence remains valid.
+
+**Floor re-executed at `cc32ab72` (2026-11-12):**
+
+| Check | Result |
+|-------|--------|
+| Backend unit floor `uv run pytest -m "not integration" -q` | **890 passed**, 10 deselected (888 + 2 committed ha-status tests) |
+| Blueprint floor subset (`test_k8s_client_configmaps.py` + `test_resources.py`) | **222 passed, 6 deselected** (unit tier, 59.9 s — deterministic). The unfiltered command additionally runs 6 kind integration tests (pods/serviceaccount/rbac/networkpolicies/cilium/priorityclasses — none configmap; all 12 configmap tests are unit-tier and green in every run): one run completes in 345 s, all pass + the 3 baseline ScopeMismatch fixture errors, no failures; a bad run exceeds 900 s with F's or a SYN_SENT hang in the kind tests (environmental — kind state / TCP timeouts to the dummy kubeconfig `1.2.3.4:6443`; the standalone kind subset passes in 24 s) |
+| Frontend targeted (`configmaps.test.tsx` + `configmap_data.test.tsx` + `Stub.test.tsx`) | **3 files, 18 passed** (9.5s) |
+| Frontend full `vitest run` | 500 passed / 2 failed — both out-of-scope: `Clusters.test.tsx > admin creates a cluster from the add dialog` (ha-status's committed add/edit-flow test; its gate is pending — W037's named follow-through) and `network_policies.test.tsx > route-consumes-incoming-meta…` (the gate's timing flake, re-confirmed: 8/8 standalone, 9.6s) |
+| `task fe-build` + `task fe-check` + `task fe-sync` | green — build up-to-date, air-gap check passed, bundle unchanged (stamp `1b8bb654aab6…` — the served SPA is current) |
+| `ruff check` on the configmap files | 0 configmap-line findings (scoped: only the 2 pre-existing k8s_client E501s at 812/2118; whole repo still 62 — unchanged) |
+| `mypy app` | 0 configmap-line findings (the 5 pre-existing k8s_client lines 233/414/429/465/840 unchanged) |
+| e2e configmap leg `ui-smoke -g "real routes"` | **1 passed** (15.1s) — every REAL_ROUTES incl. `/storage/configmap` mounts on the live stack |
+| e2e full `ui-smoke` | 1 failed / 16 did not run — still `login → /clusters renders the bound-cluster registry` (ui-smoke.spec.ts:125 `Bound clusters` vs the committed 4.1-parity heading) — **W037 re-confirmed open**, ha-status-owned, its gate pending |
+
+**Verdict unchanged: PASS.** No new findings; W037/W038/W039 stand as
+recorded. The two full-vitest failures move from "uncommitted WIP" to
+"committed, in-flight change (ha-status, phase qa) + re-confirmed flake" —
+same ownership, still outside this change's scope.
+
 ## Floor
 
 | Dimension | Weakest result | Verdict |
@@ -288,6 +333,11 @@ findings; no MISSING_RED/STALE; code-quality gates PASS; P0/P1 100%;
 verification scope COMPLETE. Findings: 0 CRITICAL / 1 WARNING (out-of-scope,
 ha-status-owned) / 2 SUGGESTION + 1 SUGGESTION fixed at the gate (stale
 comment).
+
+**Re-verified 2026-11-12 at `cc32ab72` (15 commits of drift): PASS
+unchanged** — configmap production code byte-identical since the gate (only
+`d6bf3c4f`, the gate's own comment fix); floor + e2e leg re-executed green
+at the current tip; W037 re-confirmed open (ha-status gate pending).
 
 ## Human Override
 
