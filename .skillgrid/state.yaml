@@ -126,14 +126,6 @@ in_flight:
   # predate the ADR-0040 navigation supersession, executed against the
   # session-object-navigation contract: one route per kind, no /data
   # route — the kinds were stubs, so no R7 redirect) ---
-  - change: 2026-10-28-storageclass-views
-    phase: review
-    # Executed 2026-11-04 (TASK-052): 4 commits on `rebase`
-    # (1d5bb5ba..08e37b50) — backend storageclasses kind (core,
-    # cluster-scoped, SAR-gated), list view, data view (parameters table +
-    # JSON block), ObjectRoute wiring + stub removal. Verification floor
-    # green (unit suite; fe-build + fe-check; _nav.tsx untouched). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS after fixes — this kind's SAR gate asked core group "" instead of storage.k8s.io (Low, fail-closed) — fixed at the gate with the spec zone amended (feature/blueprint/adr/briefing). Awaits ship.
-    tracker: [TASK-052]
   - change: 2026-10-28-configmap-views
     phase: qa
     # Executed 2026-11-04 (TASK-064): 4 commits on `rebase`
@@ -151,16 +143,6 @@ in_flight:
     # `task e2e` serial chain), 2 SUGGESTION (W038 blueprint file-list
     # drift, W039 no execution ledger). Next: requesting-code-review.
     tracker: [TASK-064]
-  - change: 2026-10-28-snapshotclass-views
-    phase: review
-    # Executed 2026-11-04 (TASK-051): 4 commits on `rebase`
-    # (7279d411..2365cff8) — backend snapshotclasses kind (CRD,
-    # cluster-scoped, full object, SAR-gated), list view, data view
-    # (parameters table + JSON block), ObjectRoute wiring (first ADR-0040
-    # contract build) + stub removal. Fix 320e2b4b: dev fixture CRDs needed
-    # the protected api-approved annotation (Establishment/Ready were stuck
-    # False). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS — no kind-specific findings (1 CRITICAL cross-kind ref + 2 spec PARTIALs + 1 SAR group fixed at the gate, batch-level). Awaits ship.
-    tracker: [TASK-051]
   - change: 2026-10-28-volumesnapshot-views
     phase: review
     # Executed 2026-11-04 (TASK-053): 4 commits on `rebase`
@@ -345,6 +327,22 @@ completed_changes:
   # cross-change). Next: reflect (report.md retro half in the archive).
   - 2026-11-05-pv-views
   # Shipped 2026-11-12 (keep branch `rebase` as-is, repo VERIFIED assumption:
+  # ship does not merge main). Batch member 1/5 — QA PASS (batch
+  # qa-report.md) + three-axis review Floor met-with-fixes; this kind's SAR
+  # gate asked core group "" instead of storage.k8s.io (Low, fail-closed) —
+  # fixed at the gate with the spec zone amended (feature/blueprint/adr/
+  # briefing). Fresh targeted floor 2026-11-12 on the integrated tree:
+  # backend targeted 222/222 (test_k8s_client_storageclasses +
+  # test_resources), vitest targeted 11/11 (storage_classes +
+  # storage_class_data), e2e real-routes leg 1/1 (incl.
+  # /storage/storageclass); the full floor (backend 890/890, vitest 502/502,
+  # fe-build/check/sync, ruff 62 / mypy 65) ran on this same code tree during
+  # the 2026-11-05-pv-views ship (only spec-zone commits since). Same 3
+  # out-of-scope e2e legs as that ship (W037 x2 + session-nav deep-link).
+  # Folder archived this commit. Next: reflect (report.md retro half in the
+  # archive).
+  - 2026-10-28-storageclass-views
+  # Shipped 2026-11-12 (keep branch `rebase` as-is, repo VERIFIED assumption:
   # ship does not merge main). QA PASS (batch qa-report.md, other-resource
   # batch of 6) + three-axis review Floor met-with-fixes 2026-11-12 (0C/0I;
   # 3 Minor fixed at the gate — e2e smoke title entry added to
@@ -363,6 +361,27 @@ completed_changes:
   # Folder archived this commit. Next: reflect (report.md retro half in the
   # archive).
   - 2026-10-28-runtimeclass-views
+  # Shipped 2026-11-12 (keep branch `rebase` as-is, repo VERIFIED assumption:
+  # ship does not merge main). QA PASS (storage batch of 5 qa-report.md in
+  # 2026-11-05-pv-views, re-executed at tip; F1 demo-data.sh PVC wait + F2
+  # lint debt fixed at the gate ce6d0b19/6368cc8b) + three-axis review PASS
+  # 2026-11-05 (review.md in 2026-11-05-pv-views — no kind-specific findings;
+  # the 1 CRITICAL cross-kind ref + 2 spec PARTIALs + 1 SAR group were
+  # batch-level, fixed at the gate). First ADR-0040 ObjectRoute contract
+  # build (list + /data route, no ?name= query-param navigation).
+  # Integrated-tree floor 2026-11-12 (shared with the runtimeclass ship,
+  # 6e4504d3 = ad42c4a4 + spec zone only): backend 890/890, vitest 501/502
+  # (1 flake: Clusters add-dialog under parallel load, 6/6 isolated —
+  # in-flight /clusters WIP), fe-build/check/sync green (bundle unchanged),
+  # ruff 62 / mypy 65 (below the 102/78 ceiling). e2e: real-routes sweep
+  # 1/1 standalone (incl. /storage/snapshot-class mount); full serial chain
+  # red on the W037 'Bound clusters' legs (in-flight /clusters 4.1-parity
+  # WIP — same out-of-scope record as the pv-views and runtimeclass ships).
+  # Flag (reconcile): ADR-0022 parity row still 'stub' (the pv-views ship
+  # left its row too — the row amend is each change's review-time fix per
+  # the runtimeclass precedent, not a ship-time edit). Folder archived this
+  # commit. Next: reflect (report.md retro half in the archive).
+  - 2026-10-28-snapshotclass-views
 
 # Onboarding state (2026-10-17): config.yaml + ASSUMPTIONS.md + state.yaml
 # created. Open items tracked in ASSUMPTIONS.md "Onboarding notes".
