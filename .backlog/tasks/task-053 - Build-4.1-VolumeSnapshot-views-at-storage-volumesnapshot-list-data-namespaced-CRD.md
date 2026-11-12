@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-28 15:09'
-updated_date: '2026-11-04 18:20'
+updated_date: '2026-11-12 17:55'
 labels: []
 dependencies: []
 references:
@@ -112,5 +112,5 @@ Closeout (320e2b4b): same CRD annotation fix as TASK-051 — the VolumeSnapshotC
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Built 4.1 VolumeSnapshot list+data views at /storage/volumesnapshot (namespaced snapshot.storage.k8s.io CRD) per the re-baselined ADR-0040 session-object-navigation contract. 4 commits (each independently revertable): T1 2138db40 backend kind (list_volume_snapshots/get_volume_snapshot via get_crd_served served-version+scope authority, CRD-absent->[], namespaced read, full camelCase object, SAR-gated, _KINDS+_GETTERS); T2 bb393690 list view (ConfigMap namespaced+Storage pattern, card title 'Volume Snapshot List', Usable readyToUse badge, deep-index fields — when absent, openObject ref nav); T3 443adbdf data view (NEW in 5.0 — 4.1 had none; single ?name=&namespace= fetch, CTable 4.1 cols + labels/annotations + JSON block, NOT_FOUND-as-state); T4 9af5180a routing (ObjectRoute kind=volumesnapshot, no /data route, no R7 redirect) + stub removal + demo fixture (Namespaced CRD + demo-snap). Verified: backend pytest 603 passed/10 deselected (baseline 589 + 14 new: 7 service + 7 API, TDD RED->GREEN each task); frontend vitest 343 passed/12 pre-existing failures (users/groups/admin_permissions; my 12 new tests all green); fe-build built OK; fe-check air-gap pass; fe-sync synced; git diff --stat 2365cff8..HEAD = exactly 14 files (File Structure + ui-smoke/demo-data re-baseline), _nav.tsx UNTOUCHED. Deltas from pre-rebaseline AC text: (1) list/data nav is ADR-0040 ref-based (openObject + ObjectRoute props), not ?name=&namespace= URLs — the /data URL never shipped (was a stub); (2) service test file is test_k8s_client_volume_snapshots.py (per task; AC said volumesnapshots) — CRD-absent verified at service level per the VPA/snapshotclass sibling pattern; (3) list adds a Created column (formatTimestamp) matching the sibling list templates.
+VolumeSnapshot views at /storage/volumesnapshot (backend volumesnapshots kind, namespaced CRD full object + SAR-gated, list view, data view with 4.1 columns + JSON block, ObjectRoute wiring — first ADR-0040 contract build — stub removal) shipped to rebase 2026-11-12: QA PASS (batch qa-report.md) + three-axis review Floor met-with-fixes (no kind-specific findings; batch-level 1 CRITICAL cross-kind ref + 2 spec PARTIALs + 1 SAR group fixed at the gate). Integrated-tree floor 2026-11-12: targeted backend 223/223 (test_k8s_client_volume_snapshots + test_resources), targeted vitest 12/12 (volume_snapshots + volume_snapshot_data), e2e real-routes leg 1/1 (incl. /storage/volumesnapshot); full floor (890/890 backend, 502/502 vitest, fe-build/check/sync, ruff 62/mypy 65) ran on the identical code tree during the pv-views ship. Spec zone archived at the new skillgrid location /Users/paladm/tmp/kubedash-skillgrid/xarchive/ (the spec zone moved out of the repo 2026-11-12; plain mv, diff -r empty).
 <!-- SECTION:FINAL_SUMMARY:END -->
