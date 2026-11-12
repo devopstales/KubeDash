@@ -4,7 +4,7 @@
 status: "accepted"
 date: 2026-10-29
 amended: 2026-11-04
-supersedes: the "`?name=` + `?namespace=` query-param navigation" deviations clause ratified across the 2026-10-28 view specs (recorded per spec via `NAVIGATION-SUPERSEDED.md` in `.skillgrid/specs/`)
+supersedes: the "`?name=` + `?namespace=` query-param navigation" deviations clause ratified across the 2026-10-28 view specs (recorded per spec via `NAVIGATION-SUPERSEDED.md` in `\.skillgrid/change-specs/`)
 ---
 
 **Decision-makers.** KubeDash platform team
@@ -214,5 +214,5 @@ The contract (requirements R1–R10 in `briefing.md`):
   transport untouched). Token entropy raised 32 → 64 bits in the same seam
   (QA finding S-1). Every miss path (anonymous session, malformed token,
   expired relay, second GET) renders the list, never a wrong object.
-  Record: `.skillgrid/specs/2026-10-29-session-object-navigation/`
+  Record: `\.skillgrid/change-specs/2026-10-29-session-object-navigation/`
   (`report.md` C1, `adr.md` amendment, `blueprint.md` R5 note).

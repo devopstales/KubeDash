@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KubeDash — Cluster Dashboard · Option A (CoreUI built-in)</title>
+<!-- Local CoreUI + Chart.js-free. No CDN. -->
+<link rel="stylesheet" href="../../../frontend/node_modules/@coreui/coreui/dist/css/coreui.min.css" />
+<style>
+  body { background-color: var(--cui-tertiary-bg); }
+  [data-coreui-theme='dark'] body { background-color: var(--cui-dark-bg-subtle); }
+  .icon { width: 1rem; height: 1rem; }
+  .icon-lg { width: 1.25rem; height: 1.25rem; }
+  /* CoreUI built-in only: stat tiles use border + progress. No canvas, no chart lib. */
+  .stat-value { font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
+  .stat-label { font-size: .72rem; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" hidden>
+  <symbol id="i-sync" viewBox="0 0 512 512"><path fill="currentColor" d="M472.01 144H288V55.987A40 40 0 0 0 248 16h-32a16 16 0 0 0-16 16v80a16 16 0 0 0 16 16h168v192a16 16 0 0 0 16 16h32a40 40 0 0 0 40-40V184a40 40 0 0 0-40-40Zm-432 56v96a40 40 0 0 0 40 40h184v88.013A40 40 0 0 0 264 496h32a16 16 0 0 0 16-16v-80a16 16 0 0 0-16-16H128V192a16 16 0 0 0-16-16H80a40 40 0 0 0-40 40Z"/></symbol>
+</svg>
+
+<div class="wrapper d-flex flex-column min-vh-100">
+  <header class="header p-0 mb-4">
+    <div class="container-fluid px-4 d-flex align-items-center border-bottom">
+      <strong>KubeDash</strong>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <select class="form-select form-select-sm w-auto" aria-label="Cluster">
+          <option selected>production-1</option>
+          <option>staging-1</option>
+        </select>
+        <div class="btn-group" role="group" aria-label="Theme">
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="light">Light</button>
+          <button class="btn btn-ghost-secondary btn-sm" type="button" data-theme="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+    <div class="container-fluid px-4 d-flex align-items-center">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb my-0">
+          <li class="breadcrumb-item">Dashboard</li>
+          <li class="breadcrumb-item active" aria-current="page">Cluster Dashboard</li>
+        </ol>
+      </nav>
+      <button class="btn btn-link header-toggler ms-auto" type="button" aria-label="Refresh" title="Refresh">
+        <svg class="icon icon-lg" aria-hidden="true"><use href="#i-sync" /></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="body flex-grow-1">
+    <div class="container-fluid px-4">
+
+      <!-- Cluster status strip -->
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="status" aria-label="Cluster status">
+        <span class="text-primary fw-semibold small">production-1</span>
+        <span class="badge text-bg-success">Active</span>
+        <span class="text-muted small">API https://api.prod1.example:6443 · 4 nodes</span>
+        <span class="text-muted small ms-auto">Last probe 14:32:05 UTC</span>
+      </div>
+
+      <!-- Card 1: cluster metrics, CoreUI built-in (border tiles + progress, NO canvas) -->
+      <section class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h5 class="card-title m-0 fw-bold text-primary fs-6">Cluster Metrics</h5>
+          <span class="text-muted small ms-2">observed · metrics.k8s.io</span>
+        </div>
+        <div class="card-body">
+          <div class="row row-cols-2 row-cols-lg-4 g-3">
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">CPU usage</div>
+              <div class="stat-value">41<span class="fs-6 text-muted">%</span></div>
+              <div class="progress mt-2" style="height:4px;"><div class="progress-bar" style="width:41%"></div></div>
+              <div class="small text-muted mt-2">3,280 / 8,000 millicores</div>
+            </div></div>
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">Memory usage</div>
+              <div class="stat-value">63<span class="fs-6 text-muted">%</span></div>
+              <div class="progress mt-2" style="height:4px;"><div class="progress-bar bg-warning" style="width:63%"></div></div>
+              <div class="small text-muted mt-2">101 / 160 GiB</div>
+            </div></div>
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">Pods</div>
+              <div class="stat-value">128 <span class="fs-6 text-muted">/ 140</span></div>
+              <div class="progress mt-2" style="height:4px;"><div class="progress-bar" style="width:91%"></div></div>
+              <div class="small text-muted mt-2">92 ready · 36 pending</div>
+            </div></div>
+            <div class="col"><div class="border rounded p-3 h-100">
+              <div class="stat-label text-muted text-uppercase">Storage usage</div>
+              <div class="stat-value text-muted">unknown</div>
+              <div class="progress mt-2" style="height:4px;"></div>
+              <div class="small text-muted mt-2">no storage metrics source</div>
+            </div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card 2: events (a different task -> second card, allowed) -->
+      <section class="card shadow mb-4">
+        <div class="card-header py-3 d-flex align-items-center">
+          <h5 class="card-title m-0 fw-bold text-primary fs-6">Events</h5>
+          <span class="badge text-bg-secondary ms-2">Live · SSE</span>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Severity</th>
+                <th>Object</th>
+                <th>Namespace</th>
+                <th>Reason</th>
+                <th>Message</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-nowrap">14:32:05</td>
+                <td><span class="badge text-bg-danger">Warning</span></td>
+                <td>orders-service-7d9f</td>
+                <td><a href="#">prod</a></td>
+                <td>FailedMount</td>
+                <td class="text-break">MountVolume.SetUp failed: timeout waiting for volume</td>
+                <td>3</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:31:48</td>
+                <td><span class="badge text-bg-danger">Warning</span></td>
+                <td>billing-worker-4c2b</td>
+                <td><a href="#">prod</a></td>
+                <td>OOMKilled</td>
+                <td class="text-break">Container billing exceeded memory limit 512Mi</td>
+                <td>1</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:31:02</td>
+                <td><span class="badge text-bg-warning">Warning</span></td>
+                <td>search-api-5f1e</td>
+                <td><a href="#">staging</a></td>
+                <td>BackOff</td>
+                <td class="text-break">Back-off restarting failed container</td>
+                <td>7</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:28:47</td>
+                <td><span class="badge text-bg-secondary">Normal</span></td>
+                <td>orders-service-7d9f</td>
+                <td><a href="#">prod</a></td>
+                <td>Pulled</td>
+                <td class="text-break">Container image pulled (cache hit)</td>
+                <td>1</td>
+              </tr>
+              <tr>
+                <td class="text-nowrap">14:25:19</td>
+                <td><span class="badge text-bg-danger">Warning</span></td>
+                <td>ml-trainer-job-9x2</td>
+                <td><a href="#">staging</a></td>
+                <td>FailedScheduling</td>
+                <td class="text-break">0/4 nodes available: insufficient memory</td>
+                <td>1</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mt-3 small text-muted">5 newest of 134 events in the last 15 minutes · 3 critical, 1 warning, 1 normal.</div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('[data-theme]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.documentElement.setAttribute('data-coreui-theme', button.dataset.theme)
+    })
+  })
+</script>
+</body>
+</html>

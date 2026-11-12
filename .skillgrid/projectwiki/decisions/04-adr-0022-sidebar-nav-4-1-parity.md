@@ -92,7 +92,7 @@ mapping):
 | **Interface** Other Resources | Pod Disruption Budget | `/other-resource/pod-disruption-budget` | stub | stub |
 | **Interface** Other Resources | Resource Quota | `/other-resource/resource-quota` | stub | stub |
 | **Interface** Other Resources | Limit Range | `/other-resource/limit-range` | stub | stub |
-| **Interface** Other Resources | Runtime Class | `/other-resource/runtimeclass` | stub | stub |
+| **Interface** Other Resources | Runtime Class | `/other-resource/runtimeclass` (dead — no template) | `/other-resource/runtimeclass` | implemented (feature) — 5.0 group: Other Resources (ratified deviation, 2026-10-27: 4.1's API already lived in other-resources); 4.1 had no runtimeclass template (dead nav link) — list + data follow the ratified PriorityClass precedent (2026-10-28, TASK-046) |
 | **Settings** (admin only) | Auth Provider | `/settings/sso-config` | stub | stub, admin-gated |
 | **Settings** (admin only) | Kubernetes Cluster | `/settings/k8s-config` | `/clusters` (admin cluster view) | exists |
 | **Settings** (admin only) | HA Status | `/settings/cluster-status` | stub | stub, admin-gated |
@@ -136,7 +136,11 @@ external URLs introduced).
   (`network/ingress.html.j2` / `network/ingress-class.html.j2`): the Gateway
   API kinds (Gateway, HTTPRoute, ReferenceGrant) are now TABS of the Ingress
   page, and GatewayClasses is a tab of the Ingress Class page. The Network
-  group is now exactly Services, Ingress, Ingress Class. The old URLs
+  group's 4.1-parity leaves are now exactly Services, Ingress, Ingress
+  Class (the two certmanager-external-loadbalancer Beta leaves —
+  Cert-Manager, Load Balancer — stay; the 2026-10-29 spec added them and
+  they are outside this merge's scope — 2026-11-09 review correction).
+  The old URLs
   `/network/gateway-api` and `/network/gateway-class` one-shot redirect to
   their merged pages (the ADR-0040 redirect pattern); an active ref of those
   kinds survives the redirect because the ref is session-scoped, not

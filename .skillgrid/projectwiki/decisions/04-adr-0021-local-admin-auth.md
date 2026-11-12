@@ -234,7 +234,7 @@ Its own Smorest `Api`, its own token issuing.
   cluster), ADR-0006 (static SPA serving unchanged), ADR-0013
   (permission management owns multi-user local access), ADR-0020
   (air-gap boundary; § 11 deferral narrowed in part by this ADR).
-- Spec: `.skillgrid/specs/2026-10-17-authentication-vertical/`
+- Spec: `\.skillgrid/change-specs/2026-10-17-authentication-vertical/`
   (briefing + blueprint).
 - ARCHITECTURE.md § 7.7 (air-gap) and § 11 (deferred no-IdP mode) carry
   the boundary notes.

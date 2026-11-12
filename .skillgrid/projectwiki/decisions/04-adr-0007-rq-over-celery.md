@@ -1,7 +1,7 @@
 # RQ over Celery for async tasks
 
 ---
-status: "superseded"
+status: "accepted"
 date: 2026-10-17
 backfilled: 2026-11-06
 supersedes: none

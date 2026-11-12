@@ -1,49 +1,41 @@
----
-type: Reference
-title: "Technical terms — machinery vocabulary"
-status: stable
----
+# KubeDash — Technical Terms
 
-# Technical terms
+> Architecture / platform / protocol vocabulary. **Vocabulary only** — no
+> implementation details, no specs, no scratch.
 
-Machinery vocabulary, reverse-engineered from the code (onboarding,
-2026-11-12). One definition per term; keep under ~200 lines or split.
-
-- **pgqueue** — the Postgres task queue: a `tasks` table claimed with
-  `SELECT ... FOR UPDATE SKIP LOCKED`, plus a reaper that re-queues stale
-  claims (120 s stale window) and expires jtis/kv rows (ADR-0029).
-  `backend/app/core/pgqueue.py`, `backend/app/models/task.py`.
-- **Leader gate** — enqueue/scheduling only while this replica leads: PG
-  advisory lock + a `leader_lease` row carrying a strict fencing token
-  (ADR-0031 supersedes ADR-0008). `backend/app/core/leader.py`.
-- **Worker thread** — the in-process pgqueue poll loop in the Gunicorn master:
-  schedule (leader-gated) + claim + run + reap on a 5 s cadence
-  (`backend/wsgi.py`, `_worker_loop`). Since ADR-0029 there is no RQ child
-  process.
-- **SAR gate** — `rbac.can(user, cluster, verb, resource, namespace, name)`
-  asks the target cluster via SelfSubjectAccessReview; deny → 403
-  `RBAC_DENIED`. Verdicts cached in the Postgres `kv` table (moved off Redis
-  by ADR-0030). `backend/app/services/rbac.py`.
-- **K8sClientPool** — per-cluster cached K8s clients keyed by `Cluster.id`;
-  kubeconfig decrypted with AES-256-GCM under `KUBEDASH_SECRET_KEY`. The
-  documented seam where the ADR-0010 informer cache will interpose.
-  `backend/app/services/k8s_client.py`.
-- **Object handoff** — ADR-0040: no object identity in the URL; a tab-private
-  `sessionStorage` object ref + same-origin form-POST deep link.
-  `backend/app/core/object_handoff.py`.
-- **Kind catalog** — ADR-0041: resource kinds declared in a typed catalog
-  (backend kind catalog + frontend views); one route per kind, no `/data`
-  suffix.
-- **Error envelope** — the stable machine-readable error code envelope
-  (`CLUSTER_NOT_FOUND`, `RBAC_DENIED`, `NOT_IMPLEMENTED`, …); the exception
-  repr never leaks. `backend/app/core/errors.py`.
-- **First-paint backstop** — the `first_paint_backstop` config timeout (dev:
-  5 m) bounding the initial render path.
-- **Config chain** — `kubedash.ini` → `KUBEDASH_*` env override → fail-fast
-  `ConfigError` at boot; no hard-coded identity/credential defaults
-  (ADR-0028). `backend/app/core/ini_config.py`.
-
-## Related
-
-- [[glossary/01-business-terms]] — the product vocabulary
-- [[decisions/04-adr-0029-queue-on-postgres]] — the pgqueue design record
+| Term | Definition |
+|---|---|
+| **Api** | A `flask_smorest.Api` subclass (domain-scoped REST resource). *Not* the skillgrid implementation plan (which lives at `blueprint.md` in a change folder). |
+| **View** | A `src/views/<Name>/` folder (one per route), per the CoreUI free admin template convention. *Not* a "feature" folder. |
+| **CoreUI shell** | The Header + Sidebar + Footer + `_nav` + `routes` scaffold adopted from `coreui/coreui-free-react-admin-template`. |
+| **Leader** | The replica holding the `leader_lease`; gates task enqueue/scheduling + the reaper (claim/run happens on every replica — ADR-0029). |
+| **Follower** | A replica without the lease; serves HTTP and still claims/runs tasks. |
+| **RQ** | Redis Queue — the former async task runner (in-process, leader-gated). Superseded by the Postgres `tasks` queue (ADR-0029); historical. |
+| **Informer cache** | The per-cluster, in-memory dict of K8s resources maintained by long-lived watches. The read path for all UI + services. |
+| **SSE stream** | A `text/event-stream` HTTP response used for server→client push (events, timeline, topology, logs). Client uses native `EventSource`. |
+| **MCP** | Model Context Protocol; the `/mcp` endpoint that exposes KubeDash data + actions to AI agents. |
+| **Credential plugin** | The kubectl exec credential plugin (`kubectl kubedash`) that authenticates via KubeDash-managed OIDC SSO. The kubeconfig contains only `--server` + `--cluster-name`; all SSO config is fetched from the server at auth time. |
+| **ExecCredential** | The `client.authentication.k8s.io/v1` JSON object the plugin prints to stdout for kubectl to consume. |
+| **SSOUser** | An `auth.kubedash.io/v1` object (cluster-admin only) showing a user's effective permissions, computed on-the-fly from RBAC objects. |
+| **SSOGroup** | An `auth.kubedash.io/v1` object (cluster-admin only) showing a group's effective permissions. |
+| **Aggregated API** | The KubeDash service registered as a K8s aggregated API server (kube-aggregator pattern). Serves `projects.kubedash.io/v1` + `auth.kubedash.io/v1` over mTLS on port 8443. Read-only; no data in etcd. |
+| **APIService** | The `apiregistration.k8s.io/v1` object that registers the KubeDash aggregated API with the K8s API server. |
+| **Drift detection** | The `rbac_drift_check` pgqueue task that compares cluster RBAC objects (labelled `kubedash.io/template`) against the Postgres templates, and enforces or warns on divergence. |
+| **Tracer** | A distributed trace (Tempo/Jaeger). |
+| **Session revocation propagation** | The property that ending a KubeDash web session (logout) immediately invalidates all derived credentials, via the Postgres `revoked_jtis` deny-list (a Redis set at ADR-0014 time; moved 2026-10-28, ADR-0030) + OIDC RP-initiated logout + CSR revocation. (ADR-0030, supersedes ADR-0014.) |
+| **Verify endpoint** | The `/auth/verify` subrequest endpoint that ingress controllers call (NGINX `auth_request`, Traefik `forwardauth`, Istio `ext_authz`) to authenticate a request and forward `X-Remote-*` identity headers. (ADR-0019.) |
+| **JIT** | Just-In-Time: provisioning that runs at login / elevation / NaaS approval. |
+| **PKCE** | Proof Key for Code Exchange (S256) — the OIDC public-client flow the kubectl plugin uses (no `client_secret`). |
+| **RP-initiated logout** | The OIDC `end_session_endpoint` flow that revokes the IdP refresh token on KubeDash logout. |
+| **kubedash.ini** | The operator-facing configuration file (4.1 format, minus plugins) read with `configparser` (interpolation off). The PRIMARY config source; `KUBEDASH_*` env is the higher-priority override; a missing required value fails fast at boot. (ADR-0028.) |
+| **KUBEDASH_HOME** | The single anchor env var (app root): the INI is `<home>/kubedash.ini`, the built SPA `<home>/static`. Baked as `/app` in the container; in dev derived from `wsgi.py`'s own location, never set manually. (ADR-0028; replaces `KUBEDASH_STATIC_DIR`.) |
+| **Cilium served version** | The `cilium.io` CRD version flagged `served: true` in the CRD's own `spec.versions` — resolved at read time, never hardcoded. (2026-10-26-network-policy.) |
+| **CRD-absent degrade** | A 404 on a CRD or its resource list resolves to `[]` items (feature not installed = expected state, e.g. Cilium absent), while any other read failure raises `ClusterUnreachableError` → 502. (2026-10-26-network-policy.) |
+| **Object ref** | The token-keyed `sessionStorage` entry (`kd_object_refs` registry + `kd_object_active` pointer, 15-min lazy self-expiry) that identifies the object a SPA tab has open. A pointer, not a privilege — the read stays SAR-gated. The URL never carries it. (ADR-0040.) |
+| **Deep link (object)** | The cross-tab object share path: hidden same-origin form **POST** of the opaque token → SPA-fallback 303 bounce → one-shot `<meta name="kd-object-incoming">` (Postgres `kv` table `obj_incoming:<sub>`, TTL 60 s, GETDEL one-shot pop) → `localStorage` relay adoption. The fresh tab lands on the clean route with `location.search === ''`. (ADR-0040, amended 2026-11-04.) |
+| **Object handoff** | The server-session delivery of the deep-link token: `backend/app/core/object_handoff.py` (SPA-fallback 303 POST bounce + `obj_incoming:<sub>` `kv`-table stash + one-shot meta injection; injected document is no-store). |
+| **SPA fallback** | The Flask catch-all route that serves `index.html` for non-API, non-asset paths (client-side routing) and, since ADR-0040, carries the object deep-link handoff (303 + one-shot meta). |
+| **Observed tier** | The degraded, metrics-sourced view of a resource's runtime state (the PVC/PV `Usage` column over `/metrics/pvcs` → kubelet `/stats/summary`): a separate late-resolving read from the cached list, which degrades to "—" (never a row error) when the kubelet stats are unavailable or denied. (ADR-0003 two-tier; ADR-0010 read path.) |
+| **Kind** | A Kubernetes resource class KubeDash can read (e.g. Pod, GatewayClass). Named by its API plural in the K8s API (`limitranges`), by its **registry kind** in KubeDash catalog, object refs, routes and config. |
+| **Kind catalog** | The typed registry of Kinds (API plural, group, version, scope, CRD flag, row projector) behind `K8sClient`'s generic `list(kind, ns)` / `get(kind, ns, name)` engine. The single source `ResourceApi`'s dispatch and the frontend `lib/kinds.ts` registry derive from. Per-kind methods exist only as named overrides where behaviour genuinely differs. (ADR-0041.) |
+| **Registry kind** | The singular slug identifying a Kind in KubeDash (e.g. `limitrange`, `crd`): the object ref's `kind`, the route-table key, and the config-row key. Distinct from the API plural (`limitranges`) and the route path (`/limit-range`). (ADR-0041.) |

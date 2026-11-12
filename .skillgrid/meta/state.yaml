@@ -1,6 +1,241 @@
+# KubeDash skillgrid state pointer (v2).
+# Restored 2026-11-12 from the pre-wipe backup (~/tmp/kubedash-skillgrid):
+# v1 `pipeline`/`in_flight` entries migrated into `changes` below; v1 annotations
+# are preserved verbatim as comments. This file is a POINTER, not the source of
+# truth - the spec-zone artifacts on disk are the deeper truth (change-specs/).
 schema: skillgrid/state/v2
-changes: {}
+
+changes:
+  2026-11-10-ha-status-page:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-10-ha-status-page
+    # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
+    # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
+    # active-active health (both replication directions via per-node
+    # probes of the spock.node_interface DSNs, leader_lease, tasks queue,
+    # derived healthy/degraded/down + reasons) + a real /settings/cluster-status
+    # view (replaces the stub). Optional [ha] node_dsn_overrides INI key for
+    # the host-run dev backend (F8: compose service names don't resolve on
+    # the host). Executed 2026-11-11 per user instruction (develop the
+    # prototype into kubedash as a real feature; direct execution, no
+    # ticketing). Spec zone amended: the view ships at
+    # /settings/cluster-status (user decision 2026-11-11; the earlier
+    # ha-status route rename is superseded), prototype 001 referenced as
+    # the validated approach (F15-F17, liftable module). EXECUTED
+    # 2026-11-11: 3 commits on `rebase` — e00024fc (backend service +
+    # endpoint + INI + 32 tests), 298415df (frontend view + route + nav
+    # + e2e REAL_ROUTES + 10 tests), 6963fc83 (live-verification fixes:
+    # the ADR-0028 lazy proxy hands the override back as the RAW str,
+    # typed parse moved to ini_config.resolve_ha_node_dsn_overrides;
+    # spock.node_interface DSNs are libpq keyword format —
+    # _probe_engine parses them into a URL; dev INI overrides BOTH
+    # nodes, kdpg-n1 does not resolve on the host either). Verified:
+    # unit floor 888 passed, vitest 10/10, fe-build + fe-check +
+    # fe-sync, live endpoint 200 (healthy, both nodes replicating,
+    # leader local, spock 5.0.1, candidates null = F14 host fallback),
+    # browser: page renders banner + node/leader/queue cards with real
+    # data (lag cell "—" = zero byte backlog, intentional). Next: qa.
+  2026-10-29-session-object-navigation:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-29-session-object-navigation
+    # Sliced 2026-10-29, executed 2026-11-02 (8 tickets TASK-055..062,
+    # 0b4fdb97..80f3bd0f on `rebase`). QA gate 2026-11-03: **FAIL** (1
+    # CRITICAL: R4 cross-tab deep link — the form POST body never enters the
+    # new document's URL; POST /cluster/crd → 405). FIXED 2026-11-04 per
+    # ADR-0040 amendment (user decision): SPA fallback 303 POST bounce +
+    # one-shot server-session stash (obj_incoming:<sub>, Redis 60s) +
+    # <meta kd-object-incoming> injection; 64-bit tokens (S-1 closed);
+    # ui-smoke wired into `task e2e` (W010 closed); CRD fixture in
+    # demo-data.sh (W012 closed). QA re-verified 2026-11-04: **PASS**
+    # (report.md; e2e 19/19, backend 550/550, R10-as-amended diff holds).
+    # Open: W011 (loginToken), W013 (branch lint debt), W015-W020. Next:
+    # requesting-code-review.
+  2026-10-28-resourcequota-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-resourcequota-views
+    tracker: [TASK-047]
+    # Executed 2026-10-28 (TASK-047): 4 commits on `rebase` — backend
+    # resourcequotas kind (core, namespaced, SAR-gated, 783cff0a), list
+    # view (14d8af2b), data view (0d08d0a1), routes + stub removal
+    # (0b3b97bf). Verification floor green (unit 483 passed; vitest 15/15
+    # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
+    # (batch of 6): PASS after re-executed floor (qa-report.md in
+    # 2026-10-28-other-resource-views). Awaits review.
+  2026-10-28-pdb-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-pdb-views
+    tracker: [TASK-048]
+    # Executed 2026-10-29 (TASK-048): 4 commits on `rebase` — backend
+    # poddisruptionbudgets kind (policy, namespaced, SAR-gated, 5f1f9244),
+    # list view (7a1ab3a5), data view (305a44c6), routes + stub removal
+    # (7b3e35be). Verification floor green (unit 495 passed; vitest 16/16
+    # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
+    # (batch of 6): PASS after re-executed floor (qa-report.md in
+    # 2026-10-28-other-resource-views). Awaits review.
+  2026-10-28-vpa-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-vpa-views
+    tracker: [TASK-049]
+    # Executed 2026-10-29 (TASK-049): 4 commits on `rebase` — backend
+    # verticalpodautoscalers kind (autoscaling.k8s.io, namespaced CRD, full
+    # custom object, SAR-gated, c0616fa4), list view (638acda3), data view
+    # (ecd6e98a), routes + stub removal (6bb35dd9). Verification floor green
+    # (unit 507 passed; vitest 17/17 targeted; fe-build + fe-check;
+    # _nav.tsx untouched). QA 2026-10-29 (batch of 6): PASS after
+    # re-executed floor (qa-report.md in 2026-10-28-other-resource-views).
+    # Awaits review.
+  2026-10-28-hpa-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-hpa-views
+    tracker: [TASK-050]
+    # Executed 2026-10-29 (TASK-050): 4 commits on `rebase` — backend
+    # horizontalpodautoscalers kind (autoscaling/v1, namespaced core kind,
+    # snake_case to_dict, SAR-gated, 0178df05), list view (233e827c), data
+    # view (954e7a0b), routes + stub removal (3aabed9d). Verification floor
+    # green (unit suite green; vitest 17/17 targeted; fe-build + fe-check;
+    # _nav.tsx untouched). QA 2026-10-29 (batch of 6): PASS after
+    # re-executed floor (qa-report.md in 2026-10-28-other-resource-views).
+    # Awaits review.
+  2026-10-28-limitrange-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-limitrange-views
+    tracker: [TASK-054]
+    # Executed 2026-10-29 (TASK-054): 4 commits on `rebase` — backend
+    # limitranges kind (core, namespaced, SAR-gated, aadef0d5), list view
+    # (38e16aaf), data view (fdb8ca33), routes + stub removal + e2e move
+    # (2a6e478b). Verification floor green (unit 532 passed; vitest 16/16
+    # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
+    # (batch of 6): PASS after re-executed floor (qa-report.md in
+    # 2026-10-28-other-resource-views). Awaits review.
+  2026-10-28-configmap-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-configmap-views
+    tracker: [TASK-064]
+    # Executed 2026-11-04 (TASK-064): 4 commits on `rebase`
+    # (41620987..c966685e) — backend configmaps kind (core, namespaced,
+    # SAR-gated), list view (data-keys column), data view (per-key data
+    # table + JSON block), ObjectRoute wiring + stub removal. 2026-11-05
+    # T2: trimAnnotations replicated (adr.md OVERRIDE note). QA gate
+    # 2026-11-12: **PASS** (report.md — 17/17 scenarios, floor re-run at
+    # tip: backend 888/888, targeted vitest 18/18, fe-build + fe-check,
+    # zero ruff/mypy in configmap files, e2e real-routes leg 1/1
+    # standalone incl. /storage/configmap; live API + browser
+    # verification on kubedash.dev.local:8080 — demo-config Data Keys
+    # "3", click→detail at clean URL, data table + JSON block). 1 WARNING
+    # out-of-scope (W037: the ha-status /clusters WIP breaks the full
+    # `task e2e` serial chain), 2 SUGGESTION (W038 blueprint file-list
+    # drift, W039 no execution ledger). Next: requesting-code-review.
+  2026-10-28-volumesnapshot-views:
+    phase: review
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-volumesnapshot-views
+    tracker: [TASK-053]
+    # Executed 2026-11-04 (TASK-053): 4 commits on `rebase`
+    # (2138db40..9af5180a) — backend volumesnapshots kind (CRD, namespaced,
+    # full object, SAR-gated), list view, data view (4.1 columns + JSON
+    # block), ObjectRoute wiring + stub removal. Fix 320e2b4b: dev fixture
+    # CRD needed the api-approved annotation. QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS — no kind-specific findings (1 CRITICAL cross-kind ref + 2 spec PARTIALs + 1 SAR group fixed at the gate, batch-level). Awaits ship.
+  2026-10-28-pvc-views:
+    phase: review
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-pvc-views
+    tracker: [TASK-065]
+    # Executed 2026-11-04 (TASK-065): 5 commits on `rebase`
+    # (43f7e6a8..1e453d31) — backend persistentvolumeclaims kind (core,
+    # namespaced, SAR-gated), metrics/pvcs usage route (kubelet
+    # stats/summary, query-only, SAR-degraded), list view (usage column,
+    # 3-tier status badges), data view (curated table + JSON block),
+    # ObjectRoute wiring + stub removal. Closeout fixes: 9bba46d5 (pvc_usage
+    # parsed the client's str(dict) repr — json.loads saw single quotes and
+    # degraded everything; now json-first + ast.literal_eval fallback,
+    # repr regression test) + 320e2b4b (demo-pvc consumer pod so the claim
+    # BINDS; hostPath PVs emit no pvcRef stats on kind 1.35 → Usage cell
+    # honestly shows — on the dev cluster). QA 2026-11-05 (storage batch of 5): PASS (qa-report.md in 2026-11-05-pv-views — F1 demo-data.sh PVC wait + F2 lint debt fixed at the gate, ce6d0b19/6368cc8b; floor re-run: unit 648/648, targeted vitest 85/85, e2e 19/19, ruff flat 102, mypy 73<78, dev-stack exit 0). Review 2026-11-05 (three-axis, review.md in 2026-11-05-pv-views): PASS after fixes — pvc_usage degrade hardened at the gate (non-numeric byte count + nameless pvcRef skip the node, never 500; regression test); the /metrics/pvcs sequential fan-out parked W023. Awaits ship.
+  2026-11-06-mcp-server:
+    phase: research
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-06-mcp-server
+  2026-11-06-ai-investigations:
+    phase: research
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-06-ai-investigations
+  2026-11-06-change-timeline:
+    phase: research
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-06-change-timeline
+  2026-11-06-workload-map:
+    phase: spec
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-06-workload-map
+  2026-11-07-kind-catalog:
+    phase: slicing
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-07-kind-catalog
+  2026-11-07-frontend-kind-registry:
+    phase: slicing
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-07-frontend-kind-registry
+  2026-11-07-navigation-seam:
+    phase: slicing
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-11-07-navigation-seam
+  2026-10-28-pods-deployments-views:
+    phase: spec
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-pods-deployments-views
+    # Undelivered: /workload/pods + /workload/deployments still stub routes
+    # (Stub/routes.ts), no view folder. Navigation superseded by ADR-0040
+    # (NAVIGATION-SUPERSEDED.md) — execute to the session-object-navigation
+    # contract if picked up.
+  2026-10-29-statefulsets-daemonsets-replicasets-views:
+    phase: spec
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-29-statefulsets-daemonsets-replicasets-views
+    # Undelivered: /workload/statefulsets|daemonsets|replicasets still stub
+    # routes (Stub/routes.ts), no view folder. Navigation superseded by
+    # ADR-0040 (NAVIGATION-SUPERSEDED.md).
+  2026-10-29-pod-exec-logs-views:
+    phase: spec
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-29-pod-exec-logs-views
+    # Undelivered: pod list/exec/logs views not in tree (/workload/pods stub
+    # route). The backend logs API (app/api/logs.py) belongs to the base
+    # structure, not this change.
+  2026-10-17-test-observability-pipeline:
+    phase: spec
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-17-test-observability-pipeline
+    # Partially delivered: the two security suites landed as standalone
+    # tasks (Taskfile test-security = Trivy, test-dast = Wapiti +
+    # dev/testing/wapiti-login.py). The spec core — test-all matrix,
+    # Pushgateway result pushes, Grafana test-observability dashboard, k6
+    # load, jscpd duplication — is absent. Never sliced.
+  2026-10-17-kubectl-oidc-plugin:
+    phase: spec
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-17-kubectl-oidc-plugin
+    # Undelivered: only the base-structure spine is in tree (cli/ version
+    # command; get-token/setup/clean print "not yet implemented" pointing at
+    # this blueprint; backend kubectl_auth.py is a 501 stub; no OIDC deps in
+    # go.mod). Never sliced.
+  2026-10-28-other-resource-views:
+    phase: qa
+    status: in_progress
+    spec: .skillgrid/change-specs/2026-10-28-other-resource-views
+    # Not tracked in the v1 pointer (noted at the 2026-11-12 restore);
+    # spec zone on disk with a qa-report.md, recorded at phase qa per its artifacts.
+
 progress:
-  completed_changes: 0
-  blocked_changes: 0
+  completed_changes: 26
+  blocked_changes: []
+
 constraints_ref: .skillgrid/projectwiki/ASSUMPTIONS.md
+

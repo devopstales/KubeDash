@@ -1,99 +1,129 @@
-# ASSUMPTIONS.md — KubeDash
+# KubeDash — Assumptions & In-Force ADR Index
 
-Durable project understanding. Four tiers:
+> This file holds the **tiered assumptions** (VERIFIED / INFERRED) and the
+> **`## LOCKED` ADR index** — the in-force source of truth for which
+> architectural decisions apply. The index stores a short description + the
+> path to each ADR file; `status` / `date` / `supersedes` live in the file's
+> frontmatter, **not** here. One decision per ADR file at
+> `\.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.
 
-- **VERIFIED** — facts confirmed against the repo.
-- **INFERRED (HYPOTHESIS)** — plausible, not yet confirmed.
-- **LOCKED** — the ADR index: one pointer row per in-force decision (status/supersedes/date live in each ADR file's frontmatter, not here).
-- **Open Questions** — unresolved, with a pointer to where the answer lives.
+**Highest sequence in use:** 0041
 
-Operational rules that are *not* decisions (commit format, build-toolchain floor, spec/code zone order) live in AGENTS.md's `### Rules` section, not here.
+---
 
 ## VERIFIED
 
-**Product.** KubeDash is a multi-cluster Kubernetes dashboard: one web console for
-operators to view and operate across many Kubernetes clusters, with OIDC single
-sign-on, per-user RBAC delegated to the target clusters (SelfSubjectAccessReview),
-query-only observability (Prometheus/Loki/Tempo), and a kubectl credential plugin
-for automation. Built for platform teams running more than one cluster.
+Assumptions confirmed against the code or a primary source.
 
-**Stack.** Python 3.12 (uv) backend — Flask 3 + flask-smorest (auto-OpenAPI),
-SQLAlchemy 2 + Alembic, psycopg 3, Pydantic 2, gunicorn. React 19 + TypeScript 5.8 +
-Vite frontend on the CoreUI template (pnpm; vendored SCSS, no Tailwind); TanStack
-Query (server state) + Zustand (UI state). Go 1.22 kubectl credential plugin
-(cobra). Deployment: one container (Gunicorn serves the REST API under `/api/v1/*`
-and the built SPA), Helm chart, PostgreSQL (pgEdge active-active in dev) — no Redis
-since ADR-0029/0030.
+- **Ship keeps the work branch; it does not merge into `main` by default.**
+  Closing a change (the `ship` phase: QA gate + archive move + `state.yaml`)
+  leaves the work branch (currently `rebase`) in place as the deliverable and
+  the rollback unit. Merging/rebasing a multi-concern work branch into `main`
+  is a separate, explicit act — `main` tracks `origin` (861 commits ahead of the
+  local work as of 2026-10-18), so a 60+-commit merge is a deliberate
+  blast-radius decision, not a ship default. Rollback when a branch is kept =
+  the branch itself (it never left the repo). *(Working agreement, 2026-10-18;
+  also stored in mnemonic as a project decision.)*
 
-**Task runner.** In-process pgqueue worker on every replica: a scheduler thread
-enqueues due tasks only while the replica leads (PG advisory lock + `leader_lease`
-fencing); any replica claims and runs tasks from the Postgres `tasks` table
-(`SELECT ... FOR UPDATE SKIP LOCKED`) and reaps stale claims. ADR-0029/0031.
+- **Swagger UI assets are always served locally (no CDN, no toggle).** The
+  `/api/docs` page loads `swagger-ui.css` / `swagger-ui-standalone-preset.js` /
+  `swagger-ui-bundle.js` from the app (vendored `swagger-ui-bundle` PyPI package,
+  served via `importlib.resources` on `/api/docs/*` routes) — never a CDN or any
+  external host. `OPENAPI_SWAGGER_UI_URL` is a local placeholder kept only
+  because smorest 0.47 registers the page only when that key is set (verified in
+  `flask_smorest/spec/__init__.py:100-110`). The `BearerAuth` JWT security scheme
+  is declared on the spec; page-level auth wiring is deferred. Air-gap (ADR-0020).
+  Confirmed by `backend/tests/api/test_apidocs.py` (9 tests) + QA report
+  (`\.skillgrid/change-specs/2026-10-17-swagger-ui-air-gap/report.md`).
 
-**Config.** `backend/kubedash.ini` is the primary config source; `KUBEDASH_*` env
-overrides; fail-fast at boot on missing identity/credential keys (ADR-0028).
+- **The `.skillgrid/` tree was wiped from the working tree on 2026-11-12 and
+  restored from backup the same day.** A pre-wipe copy at
+  `~/tmp/kubedash-skillgrid/` (old layout: `knowledge/`, `specs/`, `xarchive/`,
+  `state.yaml` v1, top-level `sdd/`/`prototypes/`) was loaded into the new
+  layout: vault → `.skillgrid/projectwiki/`, spec zones → `change-specs/`
+  (23), archives → `change-archive/` (26), `state.yaml` migrated v1→v2 into
+  `meta/state.yaml` (annotations preserved as comments), ledger →
+  `meta/.sdd/`, probes → `meta/.prototype/`, `WINDOWS.md` at the project root.
+  The vault, ADR record (29 in force, next: 0042), glossary, invariants,
+  workflows, gotchas, reference pages, and the 147 KB live `ARCHITECTURE.md`
+  are the original files — not regenerations. *(Verified 2026-11-12: restore
+  commit on `rebase`.)*
 
-**Auth.** OIDC is the only external authN; browser sessions in HttpOnly cookies
-(`kd_access` + `kd_refresh`); `Authorization: Bearer` accepted only for the kubectl
-credential plugin (ADR-0025). Local bootstrap-admin mode for dev (ADR-0021).
+## INFERRED
 
-## INFERRED (HYPOTHESIS)
+Assumptions reasoned from the architecture but not yet confirmed in code.
 
-- The `openwiki/` evidence index (generated 2026-11-06) is stale on task-runner
-  details (it predates ADR-0029 and still describes RQ/Redis). Treat it as
-  orientation, not source of truth — the code + ADRs win.
+- The in-flight kubectl-oidc-plugin blueprint targets the **proposed**
+  architecture (Flask-Smorest `backend/app/...`, Go `cli/`, `charts/`,
+  `frontend/`) described in `ARCHITECTURE.md`. The legacy stack on `main`
+  (`src/kubedash` Flask-Jinja2, `src/kdlogin` Go) is **not** the target of
+  that change. *(Inferred from the spec zone + branch topology; reconcile
+  against the actual build target before execution.)*
+
+---
 
 ## LOCKED
 
-In-force decisions — one row per ADR, path to the record (relative to this file's
-folder). Superseded records stay in `decisions/` but have no row here.
+In-force ADR index. An ADR is **in force** when its file `status` is
+`accepted` **and** no later ADR's `supersedes` points at it. Superseded rows
+are kept, with `In force: no`. Never delete a row; flip it instead (IRON RULE).
 
-| ADR | Decision | Record |
-|---|---|---|
-| 0001 | Flask + Flask-Smorest over FastAPI (sync WSGI, auto-OpenAPI, Pydantic-native schemas) | `decisions/04-adr-0001-flask-smorest.md` |
-| 0002 | Multi-cluster via encrypted kubeconfig registry (one-way-door) | `decisions/04-adr-0002-multi-cluster-registry.md` |
-| 0003 | Observability as query-only (no ingest) | `decisions/04-adr-0003-observability-query-only.md` |
-| 0004 | RBAC proxy via SubjectAccessReview (not local role mapping) | `decisions/04-adr-0004-rbac-proxy-sar.md` |
-| 0005 | CoreUI React + free admin template over shadcn/ui/Tailwind | `decisions/04-adr-0005-coreui-react.md` |
-| 0006 | Single-container deployment (Gunicorn serves API + static SPA) | `decisions/04-adr-0006-single-container.md` |
-| 0009 | SSE over WebSocket for server→client push | `decisions/04-adr-0009-sse-over-websocket.md` |
-| 0010 | Informer-based in-memory cache (read path — target; current spine reads direct) | `decisions/04-adr-0010-informer-cache.md` |
-| 0011 | kubectl credential plugin with server-managed SSO config | `decisions/04-adr-0011-kubectl-credential-plugin.md` |
-| 0012 | Aggregated API server for Project + SSOUser + SSOGroup | `decisions/04-adr-0012-aggregated-api.md` |
-| 0013 | Permission management: role templates + self-service kubeconfig + drift detection | `decisions/04-adr-0013-permission-management.md` |
-| 0015 | Namespace-as-a-Service (NaaS) | `decisions/04-adr-0015-namespace-as-a-service.md` |
-| 0016 | Privileged Access Management (PAM) | `decisions/04-adr-0016-privileged-access-management.md` |
-| 0017 | Just-In-Time login provisioning | `decisions/04-adr-0017-jit-login-provisioning.md` |
-| 0018 | SCIM 2.0 Gateway | `decisions/04-adr-0018-scim-2-0-gateway.md` |
-| 0019 | Ingress Auth Integration | `decisions/04-adr-0019-ingress-auth-integration.md` |
-| 0020 | Air-Gap Deployment | `decisions/04-adr-0020-air-gap-deployment.md` |
-| 0021 | Local Admin Auth (bootstrap password mode) | `decisions/04-adr-0021-local-admin-auth.md` |
-| 0022 | Sidebar navigation: 4.1 information-parity structure, Plugins group dropped | `decisions/04-adr-0022-sidebar-nav-4-1-parity.md` |
-| 0023 | User-management tables: DataTables React with the Bootstrap 5 skin | `decisions/04-adr-0023-datatables-react.md` |
-| 0024 | Secret values: react-syntax-highlighter with the an-old-hope theme | `decisions/04-adr-0024-secret-syntax-highlight.md` |
-| 0025 | Browser session transport: HttpOnly cookies, Bearer retained for the kubectl plugin | `decisions/04-adr-0025-http-only-session-cookie.md` |
-| 0027 | Plain-HTTP dev-stack default; TLS edge becomes the opt-in dev-stack-ssl | `decisions/04-adr-0027-plain-http-dev-stack-default.md` |
-| 0028 | Configuration source: kubedash.ini primary, env override, fail-fast | `decisions/04-adr-0028-ini-config-source.md` |
-| 0029 | Queue on Postgres: `tasks` table + `FOR UPDATE SKIP LOCKED` worker (supersedes 0007) | `decisions/04-adr-0029-queue-on-postgres.md` |
-| 0030 | Session revocation on Postgres: `revoked_jtis` deny-list (supersedes 0014) | `decisions/04-adr-0030-session-revocation-on-postgres.md` |
-| 0031 | Active-active Postgres via pgEdge/Spock + fencing token on `leader_lease` (supersedes 0008) | `decisions/04-adr-0031-active-active-pgedge-spock.md` |
-| 0040 | SPA object navigation: tab-private `sessionStorage` object ref + form-POST deep link | `decisions/04-adr-0040-session-object-navigation.md` |
-| 0041 | Resource kinds declared in a typed catalog (backend kind catalog + frontend views) | `decisions/04-adr-0041-kind-catalog.md` |
+| Seq | Title | In force | Path |
+|---|---|---|---|
+| ADR-0001 | Flask + Flask-Smorest over FastAPI (sync WSGI, auto-OpenAPI, Pydantic-native schemas, SocketIO) | yes | `knowledge/decisions/04-adr-0001-flask-smorest.md` |
+| ADR-0002 | Multi-cluster via encrypted kubeconfig registry (one-way-door) | yes | `knowledge/decisions/04-adr-0002-multi-cluster-registry.md` |
+| ADR-0003 | Observability as query-only (no ingest) | yes | `knowledge/decisions/04-adr-0003-observability-query-only.md` |
+| ADR-0004 | RBAC proxy via SubjectAccessReview (not local role mapping) — addendum 2026-10-21: the SAR verdict cache key carries every SAR attribute (`sar:<cluster>:<sub>:<verb>:<resource>:<group>:<namespace>:<name>`); resource reads use the registry credentials, so a verdict for one namespace or object must never answer for another | yes | `knowledge/decisions/04-adr-0004-rbac-proxy-sar.md` |
+| ADR-0005 | CoreUI React + free admin template over shadcn/ui/Tailwind | yes | `knowledge/decisions/04-adr-0005-coreui-react.md` |
+| ADR-0006 | Single-container deployment (Gunicorn serves API + static SPA) | yes | `knowledge/decisions/04-adr-0006-single-container.md` |
+| ADR-0007 | RQ over Celery for async tasks — superseded by ADR-0029 (queue on Postgres; ADR-0007 was index-only, no body file) | no | `knowledge/decisions/04-adr-0007-rq-over-celery.md` |
+| ADR-0008 | Leader election via PG advisory lock + lease table — superseded by ADR-0031 (active-active pgEdge/Spock + strict fencing token; ADR-0008 was index-only, no body file) | no | `knowledge/decisions/04-adr-0008-leader-election.md` |
+| ADR-0009 | SSE over WebSocket for server→client push | yes | `knowledge/decisions/04-adr-0009-sse-over-websocket.md` |
+| ADR-0010 | Informer-based in-memory cache | yes | `knowledge/decisions/04-adr-0010-informer-cache.md` |
+| ADR-0011 | kubectl credential plugin with server-managed SSO config | yes | `knowledge/decisions/04-adr-0011-kubectl-credential-plugin.md` |
+| ADR-0012 | Aggregated API server for Project + SSOUser + SSOGroup | yes | `knowledge/decisions/04-adr-0012-aggregated-api.md` |
+| ADR-0013 | Permission management: role templates + self-service kubeconfig + drift detection (core implemented: templates, bind/unbind, self-service kubeconfig; drift detection not in this change) | yes | `knowledge/decisions/04-adr-0013-permission-management.md` |
+| ADR-0014 | Session revocation propagation (web logout kills kubectl session) — superseded by ADR-0030 (the `jti` deny-list moves from Redis to a Postgres `revoked_jtis` table; the guarantee is preserved) | no | `knowledge/decisions/04-adr-0014-session-revocation-propagation.md` |
+| ADR-0015 | Namespace-as-a-Service (self-service onboarding + TTL'd grants) | yes | `knowledge/decisions/04-adr-0015-namespace-as-a-service.md` |
+| ADR-0016 | Privileged Access Management (additive elevation + auto-revert + break-glass) | yes | `knowledge/decisions/04-adr-0016-privileged-access-management.md` |
+| ADR-0017 | Just-In-Time login provisioning (Helm-declared builtin pipeline) | yes | `knowledge/decisions/04-adr-0017-jit-login-provisioning.md` |
+| ADR-0018 | SCIM 2.0 Gateway (IdP/HR push; identity decoupled from bindings) | yes | `knowledge/decisions/04-adr-0018-scim-2-0-gateway.md` |
+| ADR-0019 | Ingress Auth Integration (`/auth/verify` for NGINX/Traefik/Istio/Gateway API) | yes | `knowledge/decisions/04-adr-0019-ingress-auth-integration.md` |
+| ADR-0020 | Air-Gap Deployment (zero outbound calls at runtime; air-gap ≠ no-IdP) — superseded-in-part by ADR-0021 (the bootstrap-admin local mode is now implemented; the multi-user no-IdP deferral remains) | yes | `knowledge/decisions/04-adr-0020-air-gap-deployment.md` |
+| ADR-0021 | Local Admin Auth — bootstrap password mode (env-driven bootstrap admin + admin kubeconfig source; SSO stays primary) | yes | `knowledge/decisions/04-adr-0021-local-admin-auth.md` |
+| ADR-0022 | Sidebar navigation — 4.1 information-parity structure (sections, groups, entry names, order, admin gating); 4.1 Plugins group dropped (no 5.0 plugin system) | yes | `knowledge/decisions/04-adr-0022-sidebar-nav-4-1-parity.md` |
+| ADR-0023 | User-management lists use DataTables React with the Bootstrap 5 skin (4.1 table structure; CoreUI shell unchanged) | yes | `knowledge/decisions/04-adr-0023-datatables-react.md` |
+| ADR-0024 | Secret values use react-syntax-highlighter (highlight.js grammars, an-old-hope theme) instead of the 4.1 highlight.js script | yes | `knowledge/decisions/04-adr-0024-secret-syntax-highlight.md` |
+| ADR-0025 | Browser session transport is HttpOnly cookies (`kd_access` + `kd_refresh`, hint `kd_session`); `Authorization: Bearer` stays accepted for the kubectl plugin; no credentials in URLs or `localStorage` | yes | `knowledge/decisions/04-adr-0025-http-only-session-cookie.md` |
+| ADR-0026 | TLS edge + security header layer (nginx edge with internal HTTPS; ProxyFix gated on KUBEDASH_TLS_EDGE; 4.1 header set restored with two recorded deviations) — superseded by ADR-0027 (the TLS edge is no longer the `dev-stack` default) | no | `knowledge/decisions/04-adr-0026-tls-edge-and-security-headers.md` |
+| ADR-0027 | Plain-HTTP dev-stack default (backend :8080, COOKIE_SECURE=false, no cert precondition, no host :443/:80 bind); the ADR-0026 TLS edge is the opt-in `task dev-stack-ssl` (backend :8443, COOKIE_SECURE=true, KUBEDASH_TLS_EDGE) | yes | `knowledge/decisions/04-adr-0027-plain-http-dev-stack-default.md` |
+| ADR-0028 | Configuration source: `kubedash.ini` (4.1 format, minus plugins) as the primary operator-facing config, env (`KUBEDASH_*`) as override, no hard-coded defaults for identities/credentials (fail fast at boot) — supersedes-in-part the env-driven bootstrap-admin delivery of ADR-0021 | yes | `knowledge/decisions/04-adr-0028-ini-config-source.md` |
+| ADR-0029 | Queue on Postgres: `tasks` table + `SELECT ... FOR UPDATE SKIP LOCKED` poll worker (reaper + 3× exponential-backoff retry + dead-letter), replacing RQ/Redis as the task broker; poll, not `LISTEN`/`NOTIFY` | yes | `knowledge/decisions/04-adr-0029-queue-on-postgres.md` |
+| ADR-0030 | Session revocation on Postgres: `revoked_jtis` deny-list table (PK lookup on the verify-hook hot path + leader reaper), replacing the Redis `jti` set; with ADR-0029 this removes Redis's last consumers → Redis dropped from the stack | yes | `knowledge/decisions/04-adr-0030-session-revocation-on-postgres.md` |
+| ADR-0031 | Active-active Postgres via pgEdge/Spock (`pgedge/pgedge:pg17-latest` Docker Hub image, thin operator-less Helm chart + run-once init Job, `dev/` docker-compose, `autoddl` for one-shot migrations) + a **strict fencing token** on `leader_lease` (every task write fenced) to keep the ADR-0008 election correct under last-write-wins | yes | `knowledge/decisions/04-adr-0031-active-active-pgedge-spock.md` |
+| ADR-0040 | SPA object navigation: tab-private `sessionStorage` object ref (`kd_object_refs` + `kd_object_active`, 15-min lazy self-expiry) + same-origin form-POST deep link; no object identity in the URL; one route per kind (no `/data` suffix) — supersedes the "`?name=` + `?namespace=` query-param navigation" deviations clause across the 2026-10-28 view specs (status: accepted, 2026-10-29) | yes | `knowledge/decisions/04-adr-0040-session-object-navigation.md` |
+| ADR-0041 | Resource kinds are declared in a typed catalog (backend kind catalog + frontend `lib/kinds.ts` registry); generic `list/get` engine at the existing factory seam; per-kind methods only as named overrides; test doubles become fixture data | yes | `knowledge/decisions/04-adr-0041-kind-catalog.md` |
 
-Superseded records (no row): ADR-0007 (by 0029), ADR-0008 (by 0031), ADR-0014 (by
-0030), ADR-0026 (by 0027).
+> **Note on ADR-0001..0013:** these are listed in `ARCHITECTURE.md` §12
+> as the initial-architecture decisions "to be authored at brainstorming
+> time." As of the 2026-10-17 onboarding their **files did not yet exist
+> on disk** — only the index rows (carried forward from
+> ARCHITECTURE.md) and the ADR-0014..0020 files. The rows are marked
+> in-force to reflect the architecture they describe. **Resolved
+> 2026-11-06:** the 0001..0013 files were backfilled from
+> ARCHITECTURE.md §12 + current source (each status block carries
+> `backfilled: 2026-11-06`), with tracker copies
+> `decision-001..013`.
 
-Next ADR number: **0042**. 4-digit monotonic, never reused (gap 0032–0039 unused).
+---
 
-## Open Questions
+## Onboarding notes (2026-10-17)
 
-- **23 spec zones lost in the 2026-11-12 `.skillgrid/` wipe** (pre-existing
-  working-tree deletions, not restored per user direction). In-flight ones need
-  re-baselining from code + ADRs before resuming:
-  - `2026-11-07-kind-catalog` — TASK-073–079 in flight in the tracker (ADR-0041)
-  - `2026-11-10-ha-status-page` — `app/services/ha_status.py` + `app/schemas/ha_status.py` exist
-  - `2026-10-17-kubectl-oidc-plugin` — blueprint referenced by the `cli/cmd/get_token.go` stub (ADR-0011)
-  - `2026-10-17-test-observability-pipeline` — briefing + blueprint were the artifacts
-  The remaining 19 (the 2026-10-28/29 view changes, 2026-11-06 investigations,
-  navigation-seam, frontend-kind-registry) were shipped/closed before the wipe;
-  their outcomes are recoverable from the code, the tracker, and the ADRs.
+- Target codebase: the `rebase` orphan branch (docs/ADR/spec layer only).
+- `adr_style`: `madr-full` (validated). Existing ADR-0014..0020 were written
+  madr-minimal; **new** ADRs (and any backfill of 0001..0013) use madr-full.
+- `ticketing.type`: `backlogmd` (validated) — ADR-0014..0020 need
+  `.backlog/decisions/decision-014..020` copies (open task).
+- `mnemonic.enabled`: true (validated) — code index was empty at onboarding;
+  verified built + fresh 2026-11-03 (`code_status`: 4239 chunks / 604 files,
+  FTS5 + graph + 768-dim embedder, `stale: false`).

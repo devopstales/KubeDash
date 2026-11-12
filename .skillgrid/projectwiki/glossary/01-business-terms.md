@@ -1,39 +1,22 @@
----
-type: Reference
-title: "Business terms — product vocabulary"
-status: stable
----
+# KubeDash — Business Terms
 
-# Business terms
+> Domain / product / workflow vocabulary. **Vocabulary only** — no
+> implementation details, no specs, no scratch. One term per entry; sharpen
+> fuzzy or overloaded language the moment it is resolved.
 
-Product vocabulary, reverse-engineered from the code + ADRs (onboarding,
-2026-11-12). One definition per term; keep under ~200 lines or split.
-
-- **Cluster** — a Kubernetes cluster registered in the registry with its
-  kubeconfig stored encrypted at rest (AES-256-GCM). The registry is a
-  one-way door (ADR-0002). `backend/app/models/cluster.py`.
-- **Local cluster** — the synthetic cluster (id 0) backed by the admin
-  kubeconfig source (in-cluster or file); visible to `role == "admin"` users
-  only (ADR-0021). `backend/app/services/k8s_client.py`.
-- **Binding** — the user↔cluster association that gates access. A missing
-  binding returns the same 404 `CLUSTER_NOT_FOUND` as a missing cluster
-  (`bound_cluster_or_404`). `backend/app/models/binding.py`.
-- **Bootstrap admin** — the local admin provisioned from
-  `bootstrap_admin_email` + `[security] admin_password` (dev:
-  admin@local / admin), idempotent at boot (ADR-0021).
-- **Namespace-as-a-Service (NaaS)** — self-service namespace onboarding with
-  TTL'd grants (ADR-0015); expiry is the `ns_request_expiry` task.
-- **Privileged access (PAM)** — additive elevation over the user's baseline
-  RBAC, with auto-revert and a break-glass path (ADR-0016).
-- **RBAC template** — a reusable role definition for permission management:
-  templates, self-service kubeconfig, drift detection (ADR-0013).
-- **Air-gap** — the deployment constraint: zero outbound calls at runtime;
-  the bundle must reference no CDN/external URL (ADR-0020, `task fe-check`).
-- **One-way door** — a change that is cheap to enter and expensive to leave:
-  the cluster registry schema and `KUBEDASH_SECRET_KEY`. ADR-gated +
-  migration-gated; escalate before touching.
-
-## Related
-
-- [[glossary/02-technical-terms]] — the machinery terms
-- [[decisions/README]] — the decision records these terms come from
+| Term | Definition |
+|---|---|
+| **Cluster** | A registered Kubernetes API server that KubeDash manages. A first-class entity; users are bound to clusters. |
+| **Binding** | The user × cluster × namespace × template permission grant. The unit of access. (`cluster_bindings` row.) |
+| **Project** | A `projects.kubedash.io/v1` object: a 1:1 read-only projection of a Namespace, filtered by the requesting user's RBAC. `kubectl get projects` lists only namespaces the user can read. |
+| **NaaS (Namespace-as-a-Service)** | Self-service namespace onboarding: a user requests access to (or a new) namespace, an approver approves, KubeDash provisions it. Optional TTL'd grants auto-revoke. |
+| **Approver** | A user (in a configured approver group, or a `cluster-admin`) who can approve NaaS/PAM requests. Never the requester (except PAM break-glass). |
+| **Elevation** | A time-boxed PAM grant that applies an elevated role template *on top of* a user's baseline binding and auto-reverts at TTL. |
+| **Baseline** | A user's permanent binding (e.g. `viewer` on production). Elevation is additive; it never modifies the baseline. |
+| **Break-glass** | The PAM path where a `cluster-admin` self-approves their own elevation under a short TTL cap, for when no approver is reachable. |
+| **Template** | A named, reusable set of RBAC rules (a **role template**), stored in Postgres. Applying it creates the actual Role + RoleBinding in the cluster. |
+| **Role template** | A named, reusable set of RBAC rules stored in KubeDash's Postgres (not as a ClusterRole). Built-ins: viewer, developer, admin, cluster-admin. |
+| **Requester** | The user who submits an NaaS or PAM request. |
+| **SCIM** | System for Cross-domain Identity Management (RFC 7644). The protocol by which an IdP/HR source pushes user/group lifecycle to KubeDash. |
+| **Provisioning task** | A named, parameterised, idempotent cluster mutation declared in Helm and run by the JIT engine on a lifecycle trigger (login / elevation / NaaS approval). |
+| **Air-gap** | A deployment with zero outbound calls at runtime (internal IdP, cached JWKS, pre-loaded images, offline CLI, vendored Helm). Air-gap ≠ no-IdP. |

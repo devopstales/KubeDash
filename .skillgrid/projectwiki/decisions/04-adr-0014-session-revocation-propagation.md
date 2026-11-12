@@ -1,7 +1,7 @@
 # Session revocation propagation
 
 ---
-status: "superseded"
+status: "accepted"
 date: 2026-10-17
 supersedes: none
 ---

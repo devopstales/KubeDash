@@ -143,10 +143,7 @@ small.
   is a real per-request round-trip that did not exist before. **This is the one
   performance risk in the change and must be benchmarked** (see Confirmation)
   before Redis is removed.
-- Bad, because a Postgres outage now also interrupts revocation checking
-  (previously a Redis outage interrupted it but Postgres was separate). Under
-  ADR-0031 the two are the same HA-managed dependency, so this is not a *new*
-  failure class — but it does mean the hot path and the data share a fate.
+- Bad, because a Postgres outage now also interrupts revocation checking (previously a Redis outage interrupted it but Postgres was separate). Under ADR-0031 the two are the same HA-managed dependency, so this is not a *new* failure class — but it does mean the hot path and the data share a fate.
 - Bad, because the cert path still requires the cluster's CA to support
   revocation (CRL/OCSP or bundle removal) — unchanged from ADR-0014, carried
   forward.
