@@ -60,8 +60,8 @@ const selectProd = () =>
   })
 
 // kubernetes to_dict shape: snake_case, 2 data keys + the kubectl noise
-// annotation (rendered verbatim on this page — trimAnnotations is NOT
-// replicated, unlike the Secret view).
+// annotation (trimmed from the table per the 2026-11-05 trimAnnotations
+// replication — the data-renders-detail assertions pin the trim).
 const appConfig = {
   apiVersion: 'v1',
   kind: 'ConfigMap',
