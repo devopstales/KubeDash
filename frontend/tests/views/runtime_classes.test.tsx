@@ -82,6 +82,21 @@ const gvisor = {
   scheduling: { node_selector: {}, tolerations: [] },
 }
 
+// present-but-empty: pod_level_overhead {} — the cell renders an em dash
+// (an empty object is treated as absent; '' would be an empty cell).
+const kata = {
+  apiVersion: 'node.k8s.io/v1',
+  kind: 'RuntimeClass',
+  metadata: {
+    name: 'kata',
+    creation_timestamp: '2026-01-02T03:04:05Z',
+  },
+  handler: 'kata',
+  overwrite_node_sel_no_toleration: false,
+  scheduling: { node_selector: {}, tolerations: [] },
+  pod_level_overhead: {},
+}
+
 // runtimeclass-list-renders-rows-with-data-links
 
 // click-name-renders-detail-with-clean-url (R1)
@@ -161,7 +176,7 @@ test('list-overhead-absent-state', async () => {
       HttpResponse.json({
         kind: 'runtimeclasses',
         cluster: 'prod',
-        items: [runc, gvisor],
+        items: [runc, gvisor, kata],
       }),
     ),
   )
@@ -175,6 +190,10 @@ test('list-overhead-absent-state', async () => {
   expect(dashCells.length).toBeGreaterThanOrEqual(1)
   const gvisorRow = screen.getByRole('button', { name: 'gvisor' }).closest('tr')
   expect(gvisorRow?.textContent).toContain('—')
+  // the third row (pod_level_overhead: {}) renders an em dash too — an
+  // empty object is absent-shaped, never an empty cell.
+  const kataRow = screen.getByRole('button', { name: 'kata' }).closest('tr')
+  expect(kataRow?.textContent).toContain('—')
 })
 
 // list-no-cluster-state

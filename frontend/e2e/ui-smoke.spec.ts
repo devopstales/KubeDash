@@ -55,6 +55,10 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   // deliberately; fix in TASK-046's follow-up so this change's diff stays
   // about LimitRange.
   { path: '/other-resource/priorityclass', title: 'Priority Classes' },
+  // RuntimeClass (2026-10-28-runtimeclass-views): real view, kept in this
+  // sweep for the title assertion (same rationale as the stale-real-view
+  // entries above) — the view's docstring cites this e2e assertion.
+  { path: '/other-resource/runtimeclass', title: 'Runtime Classes' },
   // Admin-gated stubs (render for the bootstrap admin):
   { path: '/settings/sso-config', title: 'Auth Provider' },
 ]

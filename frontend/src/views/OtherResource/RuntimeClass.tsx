@@ -36,11 +36,12 @@ const toRow = (item: RuntimeClassItem): RuntimeClassRow => ({
     item.overwrite_node_sel_no_toleration == null
       ? '—'
       : String(item.overwrite_node_sel_no_toleration),
-  podLevelOverhead: item.pod_level_overhead
-    ? [item.pod_level_overhead.cpu, item.pod_level_overhead.memory]
-        .filter(Boolean)
-        .join(' / ')
-    : '—',
+  // Present-but-empty pod_level_overhead ({}): an em dash, same as absent —
+  // '' (an empty cell) would diverge from the data view's N/A fallback.
+  podLevelOverhead:
+    [item.pod_level_overhead?.cpu, item.pod_level_overhead?.memory]
+      .filter(Boolean)
+      .join(' / ') || '—',
   created: formatTimestamp(item.metadata?.creation_timestamp),
 })
 
