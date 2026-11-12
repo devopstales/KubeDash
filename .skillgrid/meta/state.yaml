@@ -1,0 +1,6 @@
+schema: skillgrid/state/v2
+changes: {}
+progress:
+  completed_changes: 0
+  blocked_changes: 0
+constraints_ref: .skillgrid/projectwiki/ASSUMPTIONS.md

@@ -33,7 +33,7 @@ enqueue/scheduling is leader-gated (PG advisory lock + `leader_lease` table)
 | `cli/` | Go kubectl credential plugin (cobra) |
 | `charts/kubedash/` | Helm chart (N replicas, leader election) — the deployment artifact |
 | `dev/` | docker-compose dev stack, kind config, certs/TLS, demo-data scripts |
-| `.skillgrid/` | Skillgrid: knowledge bundle, ADR index, specs, state |
+| `.skillgrid/` | Skillgrid: project wiki (knowledge, ADRs), specs, state |
 | `.backlog/` | Backlog.md tracker (tasks, decisions, milestones) |
 
 ## Engineering Standards
@@ -55,7 +55,7 @@ enqueue/scheduling is leader-gated (PG advisory lock + `leader_lease` table)
 
 ## Dependency Policies
 
-- **ADR-gated domains:** stack, deployment shape, auth, push transport, task runner, caching, config source. Check `.skillgrid/ASSUMPTIONS.md` § LOCKED before changing any of them.
+- **ADR-gated domains:** stack, deployment shape, auth, push transport, task runner, caching, config source. Check `.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED before changing any of them.
 - **New third-party dependency:** record a new ADR (madr-full) before it lands; every ADR also gets a `.backlog/decisions/decision-NNN` copy (NNN = ADR number, zero-padded to 3).
 
 ## Architecture Constraints
@@ -94,49 +94,47 @@ reference `~/.agents/skills/_shared/rules/sdd-structure.md`
 <!-- skillgrid:start -->
 ## Skillgrid
 
-This project is configured with Skillgrid. Project: **kubedash**.
+This project is configured with Skillgrid. Project: **KubeDash**.
 
 Config: `.skillgrid/config.yaml` (static) — read it before running any Skillgrid skill.
-State: `.skillgrid/state.yaml` (dynamic) — where the project is right now (phase, current change, progress).
+State: `.skillgrid/meta/state.yaml` (dynamic) — where the project is right now (phase, current change, progress).
 
 ### Artifacts
 
 | Artifact | Path |
 |----------|------|
-| Project knowledge (architecture, terms, ADRs, constraints) | `.skillgrid/knowledge/` (OKF bundle: `decisions/` `glossary/` `invariants/` `workflows/` `reference/` + `index.md`) |
-| Architecture (live) | `.skillgrid/ARCHITECTURE.md` — update when the codebase changes |
-| In-force ADR index | `.skillgrid/ASSUMPTIONS.md` § LOCKED |
-| Project state (phase, current change, progress) | `.skillgrid/state.yaml` |
-| Specs (briefing, blueprint, tasks, acceptance) | `.skillgrid/specs/` |
-| Execution ledger | `.skillgrid/sdd/` (gitignored) |
+| Project knowledge (PRD, architecture, terms, ADRs, constraints, research) | `.skillgrid/projectwiki/` |
+| Project state (phase, current change, progress) | `.skillgrid/meta/state.yaml` |
+| Specs (briefing, blueprint, tasks) | `.skillgrid/change-specs/` |
+| Execution ledger | `.skillgrid/meta/.sdd/` (gitignored) |
 
-**Domain model:** read the vocabulary + ADRs under `.skillgrid/knowledge/` (`glossary/` + `decisions/`, index: `index.md`; in-force decisions: `.skillgrid/ASSUMPTIONS.md` § LOCKED) before designing or implementing.
+**Domain model:** read the vocabulary + ADRs under `.skillgrid/projectwiki/decisions/` (index: `README.md`) before designing or implementing.
 
 **Rules & standards:** operational rules are owned by this file's `### Rules` section (the real source — edit there). Shared standards are referenced, never inlined — each loads via the skills that apply it.
 
-- **Coding conventions** — reference `~/.agents/skills/_shared/rules/code-standards.md` for detailed coding conventions.
-- **Testing conventions** — reference `~/.agents/skills/_shared/references/strict-tdd.md` for the TDD cycle and testing conventions.
-- **Commits & verification** — reference `~/.agents/skills/_shared/rules/commits.md` for the commit contract, `~/.agents/skills/_shared/rules/verification-ladder.md` for the verification ladder, and `~/.agents/skills/_shared/planning/rigor-tiers.md` for rigor tiers.
-- **Memory, code index & web cache** — reference the `skillgrid:mnemonic` skill (shared rules: `~/.agents/skills/_shared/rules/mnemonic-memory.md`, `mnemonic-artifacts.md`, `mnemonic-code-indexing.md`).
+- **Coding conventions** — reference `.agents/skills/_shared/rules/code-standards.md` for detailed coding conventions.
+- **Testing conventions** — reference `.agents/skills/_shared/references/strict-tdd.md` for the TDD cycle and testing conventions.
+- **Commits & verification** — reference `.agents/skills/_shared/rules/commits.md` for the commit contract, `.agents/skills/_shared/rules/verification-ladder.md` for the verification ladder, and `.agents/skills/_shared/planning/rigor-tiers.md` for rigor tiers.
+- **Memory, code index & web cache** — reference the `skillgrid:mnemonic` skill (shared rules: `.agents/skills/_shared/rules/mnemonic-memory.md`, `.agents/skills/_shared/rules/mnemonic-artifacts.md`, `.agents/skills/_shared/rules/mnemonic-code-indexing.md`).
 
 ### Rules
 
-*Operational rules only — the real source of truth is this section (edit here). Design decisions do not live here; they are ADRs in `.skillgrid/ASSUMPTIONS.md` § LOCKED → `.skillgrid/knowledge/decisions/04-adr-NNNN-slug.md`.*
+*Operational rules only — the real source of truth is this section (edit here). Design decisions do not live here; they are ADRs in `.skillgrid/projectwiki/ASSUMPTIONS.md` § `LOCKED` → `.skillgrid/projectwiki/decisions/04-adr-NNNN-slug.md`.*
 
 - **Ship keeps the work branch** — the `ship` phase does NOT merge into `main`. The work branch (`rebase`) is the deliverable and the rollback unit; merging into `main` is a separate, explicit act (VERIFIED assumption, 2026-10-18).
-- **ADR gate** — check `.skillgrid/ASSUMPTIONS.md` § LOCKED before touching an ADR-gated domain (Dependency Policies). New ADRs: madr-full, 4-digit monotonic, never reused (next: 0042); each also gets a `.backlog/decisions/decision-NNN` copy.
+- **ADR gate** — check `.skillgrid/projectwiki/ASSUMPTIONS.md` § LOCKED before touching an ADR-gated domain (Dependency Policies). New ADRs: madr-full, 4-digit monotonic, never reused (next: 0042); each also gets a `.backlog/decisions/decision-NNN` copy.
 - **Conventional commits** only; work units atomic and independently revertable.
-- **Tracker is pipeline-driven** — SDD tickets are created by the `ticketing` skill and phase-lifecycle tracker updates follow `~/.agents/skills/_shared/rules/ticketing/backlogmd.md`. The Backlog nudge's conversation-start `backlog instructions overview` read applies to conversations doing tracker work (create/execute/finalize/lookup); for pipeline work the entry is `.skillgrid/state.yaml` + the in-flight spec, not the tracker. The versioned guides (`task-creation` / `task-execution` / `task-finalization`) stay mandatory before their lifecycle actions.
+- **Tracker is pipeline-driven** — SDD tickets are created by the `ticketing` skill and phase-lifecycle tracker updates follow `~/.agents/skills/_shared/rules/ticketing/backlogmd.md`. The Backlog nudge's conversation-start `backlog instructions overview` read applies to conversations doing tracker work (create/execute/finalize/lookup); for pipeline work the entry is `.skillgrid/meta/state.yaml` + the in-flight spec, not the tracker. The versioned guides (`task-creation` / `task-execution` / `task-finalization`) stay mandatory before their lifecycle actions.
 - **Spec zone commits before code zone** — spec artifacts land before the change that implements them.
 - **Frontend loop** — use `task fe-dev`, never bare `pnpm dev` (no `VITE_API_BASE` → CORS-fails against :8080). After any frontend change: `task fe-build` + `task fe-sync` (Flask serves `backend/static/`), and `task fe-check` before shipping.
 - **Backend loop** — `uv run pytest -m "not integration"` is the unit floor; integration tests are kind-gated (`task kind-up`) and need Docker (Testcontainers).
 - **Config** — the INI is the source of truth (ADR-0028): change `backend/kubedash.ini` and `kubedash.ini.example` together with config code; never reintroduce hard-coded identity/credential defaults.
-- **Knowledge bundle** — any write to a `.skillgrid/knowledge/` concept file updates `index.md` + `log.md` in the same edit.
+- **Project wiki same-edit rule** — any write to a `.skillgrid/projectwiki/` page is followed by `mnemonic projectwiki index` in the same edit (the derived `index/` + FTS rows are engine-owned, never hand-edited).
 - **Prose** — markdown the agent writes or reviews follows the `~/.agents/skills/google-styleguides/` group (python, typescript, go, markdown, json, shell, html-css): advisory, defers to the repo formatters (`ruff`/`mypy`, `tsc`/`eslint`, `gofmt`). Use `skillgrid:codebase-design` vocabulary (module, interface, seam, depth) for interface-design discussion in ADRs/specs.
 
 ### Issue Tracker
 
-Backlog.md — reference `~/.agents/skills/_shared/rules/ticketing/` (backlogmd, github, gitlab, jira CLI + formatting standards) for ticketing conventions.
+Backlog.md — reference `.agents/skills/_shared/rules/ticketing/` (backlogmd, github, gitlab, jira CLI + formatting standards) for ticketing conventions.
 
 ### Memory
 
@@ -144,20 +142,20 @@ Persistent memory is active (Mnemonic). Use `mem_save` for decisions, `mem_searc
 
 ### Workflow
 
-`brainstorming` → `writing-blueprints` → `slicing` → `ticketing` → execution (`subagent-execution` or `simple-execution`) → `qa` → `requesting-code-review` → `receiving-code-review` → `ship` → `reflect`
+`brainstorming` → `writing-blueprints` → `slicing` → `ticketing` → execution (`subagent-execution` or `simple-execution`) → `qa` → `code-review` → `receiving-code-review` → `ship` → `reflect`
 
 Run `skillgrid:onboarding` to update config after stack changes.
-<!-- knowledge-base:start -->
-### KnowledgeBase
+<!-- project-wiki:start -->
+### ProjectWiki
 
-This project uses the skillgrid knowledge base (KB): an OKF vault at `.skillgrid/knowledge/` + a derived FTS index, served by the `kb` engine — `mnemonic kb ...` CLI and the `kb_*` MCP tools (the shared KbHandler — CLI and MCP never diverge).
+This project uses the skillgrid project wiki: an OKF vault at `.skillgrid/projectwiki/` + a derived FTS index, served by the `projectwiki` engine — `mnemonic projectwiki ...` CLI and the `projectwiki_*` MCP tools (the shared ProjectWikiHandler — CLI and MCP never diverge).
 
-- **Read**: `kb_query` (stage-1 ranked retrieval) → `kb_read` (full page / `##` section + pin-check state) → `kb_search` (raw FTS power path).
-- **Save**: `kb_generate` — the KB's proactive save (run it after significant `mem_save`; incremental by default, `--full` re-derives).
-- **Verify**: grounded pages pin live code (working-tree-relative anchors); `kb validate --strict` is the CI gate (drift → exit 1).
-- **Maintain**: `kb lint [--fix]` · `kb index` (incremental) / `kb reindex` (full) · `kb status` · `kb rebuild-meta` · `kb cite-source`.
-- Vault files are truth (KB-INV-1); `index/**` + the `kb_*` rows are derived — never hand-edit (KB-INV-3).
-<!-- knowledge-base:end -->
+- **Read**: `projectwiki_query` (stage-1 ranked retrieval) → `projectwiki_read` (full page / `##` section + pin-check state) → `projectwiki_search` (raw FTS power path).
+- **Save**: `projectwiki_generate` — the project wiki's proactive save (run it after significant `mem_save`; incremental by default, `--full` re-derives).
+- **Verify**: grounded pages pin live code (working-tree-relative anchors); `projectwiki validate --strict` is the CI gate (drift → exit 1).
+- **Maintain**: `projectwiki lint [--fix]` · `projectwiki index` (incremental) / `projectwiki reindex` (full) · `projectwiki status` · `projectwiki rebuild-meta` · `projectwiki cite-source`.
+- Vault files are truth (PW-INV-1); `index/**` + the `projectwiki_*` rows are derived — never hand-edit (PW-INV-3).
+<!-- project-wiki:end -->
 
 <!-- skillgrid:end -->
 
@@ -238,19 +236,3 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 </CRITICAL_INSTRUCTION>
 <!-- mnemonic:end -->
 
-<!-- OPENWIKI:START -->
-
-## OpenWiki
-
-This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
-
-- Do not enumerate, preload, or search wikis at task start. Use retrieval when the user asks for it, when unfamiliar architecture or dependency behavior materially affects the task, or when source inspection leaves an important uncertainty. Stop once the question is grounded.
-- When those conditions apply and OpenWiki retrieval tools are available, use `openwiki_search` for just-in-time context and `openwiki_read` for the relevant complete sections. If search returns `workspace_required`, ask which listed workspace to use and retry with its ID.
-- Use `openwiki_list_workspaces` or `openwiki_list_wikis` when workspace membership itself needs to be discovered.
-- If the retrieval tools are unavailable, read `openwiki/quickstart.md` and follow its links to the relevant pages.
-- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
-- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
-
-Use the repository's documented maintenance process to refresh generated pages after source changes. Check its configuration and completed runs before relying on automatic updates. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
-
-<!-- OPENWIKI:END -->

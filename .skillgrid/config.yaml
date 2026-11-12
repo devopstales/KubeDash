@@ -1,37 +1,190 @@
-# KubeDash skillgrid configuration
-# Validated with the user on 2026-10-17 (onboarding).
+schema: skillgrid/v1
+project: KubeDash
+context: >-
+  Multi-cluster Kubernetes dashboard — OIDC auth, per-user RBAC (SAR proxy),
+  observability (query-only), kubectl credential plugin. One Gunicorn container:
+  Flask 3 + Smorest REST API + built React SPA + in-process pgqueue worker
+  (leader-gated enqueue). Python 3.12 (uv) / React 19 + Vite (pnpm) / Go 1.22 CLI
+  / Helm chart / Postgres (pgEdge active-active).
 
-project: kubedash
+# --- Ticketing ---
+ticketing:
+  enabled: true
+  type: backlogmd
+  backlogmd:
+    dir: .backlog
+    task_prefix: "task"
+    zero_padded_ids: 3
+  gh:
+    labels:
+      triage: "needs-triage"
+      info: "needs-info"
+      ready_agent: "ready-for-agent"
+      ready_human: "ready-for-human"
+      wontfix: "wontfix"
+  glab:
+    labels:
+      triage: "needs-triage"
+      info: "needs-info"
+      ready_agent: "ready-for-agent"
+      ready_human: "ready-for-human"
+      wontfix: "wontfix"
 
-# Where the knowledge base + ADRs + specs live.
-# 2026-10-26: knowledge root moved .skillgrid/artifacts/ -> .skillgrid/knowledge/
-# (OKF v0.2 bundle: decisions/, glossary/, invariants/, workflows/, reference/
-# + index.md / log.md / reverse-index.md).
-# 2026-11-08: archive root moved .skillgrid/archive/ -> .skillgrid/xarchive/
-# (xarchive is the only archive convention; archive/ folded into it).
+# --- Testing ---
+testing:
+  runner: "uv run pytest -m \"not integration\" (backend) + corepack pnpm test (frontend) + go test ./... (cli)"
+  setup: "uv sync (backend) + task fe-install (frontend, frozen pnpm)"
+  layers: [unit, integration, e2e]
+  coverage: ""
+  mutation: ""
+  tdd: true
+
+# --- QA Gates ---
+quality:
+  coverage_min: 0
+  mutation_min: 0
+  p0_pass_rate: 100
+  p1_pass_rate: 95
+
+# --- Security Scan (Trivy) ---
+security:
+  trivy:
+    command: "trivy fs"
+    target: "."
+    severities: "CRITICAL"
+    scan_types: "vuln"
+    fail_on: "CRITICAL"
+
+# --- Commands ---
+commands:
+  build: "task build (cli) / task fe-build (frontend)"
+  lint: "uv run ruff check . && uv run mypy app (backend) / corepack pnpm lint (frontend) / go vet ./... (cli)"
+  format: "uv run ruff format (backend) / corepack pnpm lint --fix (frontend) / gofmt -w . (cli)"
+  typecheck: "uv run mypy app (backend) / pnpm exec tsc --noEmit (frontend) / go vet ./... (cli)"
+
+# --- AGENTS.md preamble (repo-specific, rendered by `skillgrid init`) ---
+agents:
+  directories:
+    - { path: "backend/", purpose: "Flask 3 + Smorest app factory — app/{core,api,models,services,tasks}, migrations/ (Alembic), tests/ (pytest), wsgi.py (Gunicorn + pgqueue worker), Dockerfile (3-stage), kubedash.ini (primary config, ADR-0028), static/ (the served SPA bundle)" }
+    - { path: "frontend/", purpose: "React 19 + TS + Vite (CoreUI template) — src/views/ (one folder per route), tests/ (Vitest + RTL), e2e/ (Playwright), STYLEGUIDE.md (UI pieces)" }
+    - { path: "cli/", purpose: "Go kubectl credential plugin (cobra)" }
+    - { path: "charts/kubedash/", purpose: "Helm chart (N replicas, leader election) — the deployment artifact" }
+    - { path: "dev/", purpose: "docker-compose dev stack, kind config, certs/TLS, demo-data scripts" }
+    - { path: ".skillgrid/", purpose: "Skillgrid: project wiki (knowledge, ADRs), specs, state" }
+    - { path: ".backlog/", purpose: "Backlog.md tracker (tasks, decisions, milestones)" }
+  security_boundaries:
+    - "Air-gap (ADR-0020): zero outbound calls at runtime; no CDN/external references in the built bundle — task fe-check is the gate (CI runs the same script)."
+    - "Sessions (ADR-0025): HttpOnly cookies (kd_access + kd_refresh); no credentials in URLs or localStorage; Authorization: Bearer is accepted only for the kubectl credential plugin."
+    - "One-way doors (ADR-gated + migration-gated): the cluster registry schema and KUBEDASH_SECRET_KEY (AES-256-GCM for kubeconfig encryption — distinct from the HS256 JWT key)."
+    - "Config (ADR-0028): backend/kubedash.ini is the primary source, KUBEDASH_* env is override, no hard-coded defaults for identities/credentials — fail fast at boot. Do not add fallback defaults."
+    - "Escalate (stop and ask): any change touching the one-way doors, session transport, or the auth flow beyond an ADR's stated scope."
+  dependency_policies:
+    - "ADR-gated domains: stack, deployment shape, auth, push transport, task runner, caching, config source. Check .skillgrid/projectwiki/ASSUMPTIONS.md § LOCKED before changing any of them."
+    - "New third-party dependency: record a new ADR (madr-full) before it lands; every ADR also gets a .backlog/decisions/decision-NNN copy (NNN = ADR number, zero-padded to 3)."
+  architecture_constraints:
+    - "Single container (ADR-0006): Gunicorn serves the REST API + the built SPA; the pgqueue worker is in-process on every replica with leader-gated enqueue (ADR-0029/0031; ADR-0007/0008 superseded)."
+    - "Dev DB is migration-managed: Alembic is the schema source of truth — never hand-edit the dev DB's schema; task dev-stack applies the same head path prod uses."
+    - "Chart is the deployment artifact: helm lint + helm template must stay green; CI e2e installs the chart into kind against a mock OIDC."
+  definition_of_done:
+    - "CI (.github/workflows/ci.yaml): backend ruff check + mypy app + pytest -m \"not integration\"; frontend tsc --noEmit + eslint + vite build + air-gap check; CLI go vet + go test; chart helm lint + helm template + tests/test_chart.py; image build + Trivy CRITICAL gate; workflow lint."
+    - "E2E (.github/workflows/e2e.yaml, main): kind + Helm install + mock OIDC + Playwright smoke."
+    - "Local floor before shipping: unit suite green (uv run pytest -m \"not integration\"), task fe-build + task fe-check after any frontend change, task e2e when the auth/SPA surface changed."
+  engineering_standards:
+    - "Backend layering: app/api/<domain>.py is one Smorest Api per domain (≤ ~300 lines, Pydantic schemas, no cross-domain imports). app/services/ is pure Python with no Flask imports — the integration boundary. app/models/ is SQLAlchemy 2.0."
+    - "Read path (target): UI and read services should read from the informer cache, not per-request K8s API calls (ADR-0010 — the current spine uses direct per-request reads; see the ADR's deferral note). Mutations go through the API."
+    - "Push: SSE is the primary server→client channel; WebSocket only for bidirectional exec (ADR-0009)."
+    - "Tasks: tasks in app/tasks/ are claimed from the Postgres queue by any replica; enqueue/scheduling is leader-gated (ADR-0029/0031 — supersedes ADR-0008)."
+    - "Frontend: view-folder layout (one folder per route, CoreUI convention). Server state → TanStack Query; UI state → Zustand. No Tailwind — CoreUI SCSS. UI pieces follow frontend/STYLEGUIDE.md."
+    - "Object navigation: no object identity in the URL (ADR-0040) — session-scoped object ref + same-origin form-POST deep link; one route per kind (no /data suffix)."
+
+# --- Conventions ---
 conventions:
-  artifacts: .skillgrid/knowledge
-  specs_root: .skillgrid/specs
-  archive_root: .skillgrid/xarchive
-  state_file: .skillgrid/state.yaml
+  specs_root: .skillgrid/change-specs
+  scratch_dir: .skillgrid/meta/.sdd
+  artifacts: .skillgrid/projectwiki
+  worktree_dir: .worktrees
+  commit_style: conventional
+  state_file: .skillgrid/meta/state.yaml
 
-# ADR body shape (validated choice). The 7 existing ADRs (0014-0020) were
-# authored madr-minimal; new ADRs use madr-full. The LOCKED index in
-# ASSUMPTIONS.md is the in-force source of truth.
+# --- Work-unit commits (commit + session events, confirmed 2026-11-12) ---
+checkpoint:
+  enabled: true
+
+# --- ADR format (confirmed 2026-10-17; never re-ask) ---
 adr_style: madr-full
 
-# ADR numbering: 4-digit, monotonic, never reused. Highest in use: 0041.
-adr:
-  zero_padded: 4
-  highest_sequence: 41
+# --- BDD / Acceptance Testing ---
+bdd:
+  enabled: true
+  stack: javascript
+  specs_dir: .skillgrid/change-specs
+  runner_dir: acceptance-tests
+  lint: gherkin
 
-# Backlog.md tracker: every ADR also gets a .backlog/decisions/decision-NNN
-# copy (validated choice). NNN is the ADR number zero-padded to 3.
-ticketing:
-  type: backlogmd
-  zero_padded_ids: 3
-  decisions_dir: .backlog/decisions
-
-# Mnemonic recall over the knowledge base (validated choice: enabled).
+# --- Mnemonic (persistent memory + code index + web cache) ---
 mnemonic:
   enabled: true
+  data_dir: ~/.skillgrid/mnemonic
+  # embedder: machine-local (~/.skillgrid/config.d/indexing.yaml) — ollama,
+  # embeddinggemma:300m @ localhost:11434/v1. No repo-local config.d/indexing.yaml
+  # (endpoint stays uncommitted).
+
+# --- Research ---
+research:
+  default: research
+  output_dir: .skillgrid/change-specs
+  code_research_preset: standard
+
+# --- Prototype (feasibility probe) ---
+prototype:
+  enabled: true
+  dir: .skillgrid/meta/.prototype
+  findings: .skillgrid/change-specs/{topic}/findings.md
+  module_dir: .skillgrid/change-specs/{topic}/modules
+
+# --- Sketch (UI/interaction variant mockup) ---
+sketch:
+  enabled: true
+  findings: .skillgrid/change-specs/{topic}/findings.md
+  dir: .skillgrid/change-specs/{topic}/sketches
+
+# --- Rules (per-phase overrides) ---
+rules:
+  brainstorm: []
+  blueprint: []
+  slicing: []
+  execution: []
+  review: []
+  tiers:
+    default: T2
+    T0: { name: Prototype, blueprint: none,  qa: self-check }
+    T1: { name: Alpha,     blueprint: light, qa: L1+verify  }
+    T2: { name: Beta,      blueprint: full,  qa: L2+L3,     review: two-axis }
+    T3: { name: GA,        blueprint: full,  qa: L4,        review: parallel+fresh-model }
+  ship:
+    fast_track_light: true
+  reflect:
+    verdict_gate: advisory
+  fast_track:
+    enabled: true
+    classes:
+      trivial:
+        criteria:
+          - "single concern, ≤3 files, no behavior change (typo, copy, single-line config, pure rename)"
+          - "no migration, no new dependency, no trust-boundary change"
+        skips: [brainstorming, blueprint, acceptance.feature]
+        tasks: light
+      small:
+        criteria:
+          - "single file or single concern, no new capability, no migration"
+          - "≤10 files"
+        skips: [brainstorming, blueprint]
+        tasks: light
+    waiver:
+      required: true
+      recorded_in: briefing.md
+    blocked_when:
+      - "any threat-matrix row Applicable"
+      - "new trust boundary or migration"
+      - "multi-domain impact"
+      - "400+ line change"
