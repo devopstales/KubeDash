@@ -92,7 +92,7 @@ Feature: HA Status page (admin endpoint + settings view)
     When an admin requests GET /api/v1/admin/ha-status
     Then the leader section names the leader replica_id, its token, tenure, heartbeat age, and fence
     And the lock verdict is held on the leader's node with the holder pid and session state
-    And the candidates count is null (host-run dev backend, no KubeDash Deployment)
+    And the candidates count is the configured replica count (host-run dev backend: no K8s read — the [deployment] kubedash_replica_count fallback, dev = 1; never null)
 
   Scenario: ha-status-backend-stop-no-leader
     # failure — R4 (session-scoped lock releases with the process; fail-closed)
@@ -127,7 +127,7 @@ Feature: HA Status page (admin endpoint + settings view)
     Then the leader section reports 1 leader of 3 candidates
     Given the Deployment read fails
     When an admin requests GET /api/v1/admin/ha-status
-    Then the response is 200 with candidates null
+    Then the response is 200 with candidates the configured replica count (the fallback — never null)
 
   # --------------------------------------------- DSN override (R3)
 

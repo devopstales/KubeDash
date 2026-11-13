@@ -24,6 +24,11 @@ The app now runs on a two-node pgEdge active-active cluster (ADR-0029/0030/0031;
 - **Out:** HA *control* operations (add/drop node, enable/disable subscription, resolve exceptions) — v1 is read-only; SSE push (v1 polls at 5 s); per-table channel-stats UI (the API aggregates totals; the per-table breakdown exists in the API for debugging); K8s-cluster HA (this "HA" is the Postgres/Spock cluster + the KubeDash control plane, not the target clusters).
 - Route: `/settings/cluster-status` (user decision 2026-11-11 — the page ships at the pre-rename path; the earlier rename to `/settings/ha-status` is superseded). Replacing the stub is part of this change and lands with the spec.
 
+## Deviations & gate clarifications (recorded at the 2026-11-13 QA gate — for review ratification)
+
+1. **Probe credentials (R2, constraint F7):** the initial implementation probed with the interface DSN's own user (`pgedge`, password-less) instead of substituting the app's credentials; the review's live probe showed that fails on host connections (`fe_sendauth: no password supplied` — trust auth covers only local socket, so the first gate's local-psql check had not represented the in-cluster TCP probe). The review-fix gate implemented R2's app-credential substitution on the keyword path (host/port/dbname stay the interface DSN's) — unit-pinned (`test_probe_engine_keyword_dsn_substitutes_app_credentials`). Residual: in-cluster auth of the APP user against the spock catalog is real-SQL-only (W043).
+2. **`candidates` contract (R1, F14):** `leader.candidates` falls back to the configured `[deployment] kubedash_replica_count` (minimum 1) whenever the in-cluster Deployment read is unavailable (no K8s client, RBAC, host-run dev) — i.e. it is effectively `int`, not `int | null`, and is 1 in the dev backend. The acceptance feature text was updated to match in the same gate.
+
 ## Constraints (from `findings.md`)
 
 - Per-node local state (subscription status, lag, apply worker, **the leader's lock presence**) must be queried **on** the node that has it (F2/F3/F4/F13) — under active-active the leader's lock session lives on one specific node; probing only the connected node yields a half view.

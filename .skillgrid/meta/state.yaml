@@ -15,6 +15,18 @@ changes:
     # deep-link csrf echo). 21/21 scenarios, live API + failure modes +
     # browser verified on the two-node dev cluster. W042-W045 open.
     # Report: report.md in the spec zone. Awaiting code-review.
+    # Code review 2026-11-13 (8-lens, red-team last): verdict
+    # met-with-fixes — 31 fix-now findings all closed in-gate (classid sign
+    # — live-verified both hashtext signs; R2 probe credentials + the
+    # fe_sendauth live finding; request-path bounded: parallel probes,
+    # statement_timeout, _request_timeout; pool invalidate on cluster
+    # mutation; admin-gate .first() + gate-before-lookup + UI cluster-admin
+    # role; queue failed count; kubeconfig 422; e2e journey rewritten for
+    # the 4.1-parity Clusters view incl. KubeDataTable row-click wiring;
+    # W044 spec text closed). Re-verified: 902 floor + 88 targeted, vitest
+    # affected files 100% standalone, e2e 20/20, fe-build+fe-check green.
+    # Parked: W043 (residual updated) + W046-W049. Record: review.md
+    # (disposition table). Next: ship.
     # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
     # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
     # active-active health (both replication directions via per-node
