@@ -54,6 +54,17 @@ const selectProd = () =>
     selectedNamespace: 'team-a',
   })
 
+const seedQuotaRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'resourcequota', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 // kubernetes to_dict shape: snake_case, all four 4.1 dimensions present.
 const compute = {
   apiVersion: 'v1',
@@ -263,4 +274,55 @@ test('list-empty-state', async () => {
 
   // first-class empty state, not an error.
   expect(await screen.findByText('No resource quotas found')).toBeTruthy()
+})
+
+// R9: the active ref (never a ?selected= param) bolds the opened row —
+// the sibling shape from secrets.test.tsx.
+test('bolds-the-opened-resource-quota-from-the-active-ref', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
+      HttpResponse.json({
+        kind: 'resourcequotas',
+        cluster: 'prod',
+        items: [compute, { metadata: { name: 'other', namespace: 'team-a' } }],
+      }),
+    ),
+  )
+  selectProd()
+  // The active ref (a click on compute in team-a) is what bolds the row —
+  // never a ?selected= param (R9). Render the list view directly (not
+  // through ObjectRoute, which would swap in the detail for the seeded ref).
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  seedQuotaRef('compute', 'team-a')
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/other-resource/resource-quota']}>
+        <ResourceQuotaView />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+
+  const opened = await screen.findByRole('button', { name: 'compute' })
+  expect(opened.className).toContain('fw-bold')
+  expect(opened.getAttribute('aria-current')).toBe('true')
+  const other = screen.getByRole('button', { name: 'other' })
+  expect(other.className).not.toContain('fw-bold')
+  expect(other.getAttribute('aria-current')).toBeNull()
+})
+
+// The ?? 'default' fallback: a selected cluster with no namespace set
+// fetches ?namespace=default (the sibling shape from secrets.test.tsx).
+test('defaults-to-default-namespace-when-none-selected', async () => {
+  let requested = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/resourcequotas', ({ request }) => {
+      requested = new URL(request.url).searchParams.get('namespace') ?? ''
+      return HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [] })
+    }),
+  )
+  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: null })
+  renderAt(<ResourceQuotaView />)
+
+  expect(await screen.findByText('No resource quotas found')).toBeTruthy()
+  expect(requested).toBe('default')
 })

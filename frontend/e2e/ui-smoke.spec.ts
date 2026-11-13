@@ -50,7 +50,12 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs' },
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget' },
-  { path: '/other-resource/resource-quota', title: 'Resource Quota' },
+  // ResourceQuota (2026-10-28-resourcequota-views): real view, kept in this
+  // sweep for the title assertion (same rationale as the stale-real-view
+  // entries above) — the view's docstring cites this e2e assertion. The
+  // title is the view's card title (the sidebar label 'Resource Quota'
+  // cannot satisfy an exact match, so this pins the route registration).
+  { path: '/other-resource/resource-quota', title: 'Resource Quota List' },
   // Stale debt from TASK-046's execution (no longer a stub) — left in place
   // deliberately; fix in TASK-046's follow-up so this change's diff stays
   // about LimitRange.
@@ -428,7 +433,7 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
         // The bounce stashes only when the form echoes the verified session
         // CSRF token (jti; object_handoff.post_bounce) — without it the POST
         // is a 403 and nothing is stashed, so the fresh tab renders the list.
-        const csrfMeta = document.querySelector('meta[name="kd-csrf"]')
+        const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="kd-csrf"]')
         const csrfInput = document.createElement('input')
         csrfInput.type = 'hidden'
         csrfInput.name = 'csrf'

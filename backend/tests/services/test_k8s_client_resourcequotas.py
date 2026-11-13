@@ -72,10 +72,19 @@ def test_get_resource_quota_404_returns_empty_list() -> None:
 
 def test_get_resource_quota_hit_returns_one_item() -> None:
     item = SimpleNamespace(to_dict=lambda: {"metadata": {"name": "compute"}})
-    v1 = SimpleNamespace(read_namespaced_resource_quota=lambda name, namespace: item)
+    seen: list[tuple[str, str]] = []
+
+    def read(name: str, namespace: str) -> object:
+        seen.append((name, namespace))
+        return item
+
+    v1 = SimpleNamespace(read_namespaced_resource_quota=read)
     assert _client(v1).get_resource_quota("team-a", "compute") == [
         {"metadata": {"name": "compute"}}
     ]
+    # pin the positional order (name, namespace): a transpose would 404 on
+    # every real cluster while all value-ignoring stubs stay green.
+    assert seen == [("compute", "team-a")]
 
 
 def test_get_resource_quota_other_api_error_maps_to_unreachable() -> None:
