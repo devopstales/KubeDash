@@ -3,7 +3,7 @@
 > Change: `.skillgrid/change-specs/2026-10-28-configmap-views/` (TASK-064)
 > Generated: 2026-11-13 (parallel-code-review: 7 specialist lenses + red team)
 > Diff: `41620987..c966685e` (branch `rebase`) — the change's 4 code commits
-> (41620987 backend kind, 373e7042 list view, b08f22b0 data view, c966685e
+> (41620987 backend kind, 373e7042 list view, b08f2bb8 data view, c966685e
 > routes + stub removal). Post-hoc comment-only fix d6bf3c4f (the QA gate's
 > own fix, in the change's scope) included as context.
 > QA gate: PASS (report.md, 2026-11-12, re-verified at HEAD 2026-11-12).
