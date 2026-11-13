@@ -58,7 +58,7 @@ changes:
     # Open: W011 (loginToken), W013 (branch lint debt), W015-W020. Next:
     # requesting-code-review.
   2026-10-28-resourcequota-views:
-    phase: qa
+    phase: review
     status: in_progress
     spec: .skillgrid/change-specs/2026-10-28-resourcequota-views
     tracker: [TASK-047]
@@ -68,7 +68,14 @@ changes:
     # (0b3b97bf). Verification floor green (unit 483 passed; vitest 15/15
     # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
     # (batch of 6): PASS after re-executed floor (qa-report.md in
-    # 2026-10-28-other-resource-views). Awaits review.
+    # 2026-10-28-other-resource-views). Reviewed 2026-11-13 (7-lens
+    # fan-out + red team): MET-WITH-FIXES, 0 CRITICAL — stale e2e SMOKE
+    # stub title retargeted to the view's card title, +2 frontend tests
+    # (R9 bold, ?? 'default'), SAR call-absence assert, getter arg-order
+    # pin; also fixed the pre-existing ha-status-owned tsc red in
+    # ui-smoke.spec.ts. Parked: R9-bold-unreachable + back-no-op
+    # (ObjectRoute/session-object-navigation-owned), a11y fleet
+    # convention. review.md in the spec zone. Next: ship.
   2026-10-28-pdb-views:
     phase: qa
     status: in_progress
