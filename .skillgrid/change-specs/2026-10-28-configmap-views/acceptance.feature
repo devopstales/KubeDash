@@ -105,7 +105,8 @@ Feature: ConfigMap views (list + data, namespaced)
     And the table shows the name, namespace, kind, created, and version rows
     And the kind row is "ConfigMap"
     And the labels and annotations sub-tables render
-    And the annotations sub-table includes last-applied-configuration (verbatim, NOT trimmed)
+    And the annotations sub-table trims last-applied-configuration (2026-11-05 T2 override —
+        # adr.md OVERRIDE note; the JSON block still renders the full object)
     And the data table renders one row per data entry
     And the full object is rendered as a JSON-highlighted block
 

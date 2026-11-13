@@ -137,7 +137,17 @@ changes:
     # ship/archive commits, .skillgrid restore): configmap code
     # byte-identical since the gate; floor + e2e leg re-run green;
     # W037 re-confirmed open (ha-status gate pending); PASS unchanged.
-    # Next: requesting-code-review.
+    # Reviewed 2026-11-13 (7-lens + red team; review.md): met-with-fixes,
+    # 0 unfixed Important. 9 ledger rows fixed this pass (binary_data wire
+    # shape, stale trim docstring, feature-file amendment, get_configmap
+    # arg-order pin, R9 bold test, default-ns test, e2e exact-title case,
+    # SAR call-log assert); 5 parked (cross-cutting dead-R9-bold →
+    # ObjectRoute change, kind-integration backstop follow-up, Security Low
+    # data-in-list documented intent, Performance ×2 ratified design,
+    # EdgeCases potential-only). Floor re-run green (vitest 15/15, tsc,
+    # ruff, pytest -k configmap 12/12, fe-build/fe-check, e2e real-routes
+    # 1/1 incl. the new /storage/configmap title case).
+    # Next: ship.
   2026-11-06-mcp-server:
     phase: research
     status: in_progress
