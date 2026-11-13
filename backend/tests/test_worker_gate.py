@@ -43,13 +43,17 @@ wsgi = _import_wsgi()  # module-level import; reload below re-executes
 # the first main() call (below). Importing wsgi is a no-op (app stays None).
 _ini_config_home = Path(__file__).resolve().parents[1] / "tests" / "_worker_gate_home"
 _ini_config_home.mkdir(exist_ok=True)
+# admin_kubeconfig must exist (create_app fail-fasts on a missing
+# kubeconfig-file source at boot) — content is irrelevant (the admin client
+# build is lazy; this test never reads a cluster through it).
+(_ini_config_home / "admin.kubeconfig").write_text("apiVersion: v1\n")
 (_ini_config_home / "kubedash.ini").write_text(
     "[DEFAULT]\napp_mode = development\n"
     "[security]\njwt_secret = test-jwt\n"
     "secret_key = test-enc-key-32-bytes-long!!!!\nadmin_password = test-pw\n"
     "[database]\nurl = sqlite://\n"
     "[bootstrap]\nbootstrap_admin_email = admin@local\n"
-    "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
+    f"[deployment]\nadmin_kubeconfig = {_ini_config_home / 'admin.kubeconfig'}\n"
 )
 os.environ["KUBEDASH_HOME"] = str(_ini_config_home)
 ini_config.reset()
@@ -95,6 +99,16 @@ def _reload_wsgi(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     import app.core.leader as _leader_mod
 
     monkeypatch.setattr(wsgi.get_settings(), "kubedash_role", role)
+    # Cross-tier bleed: the pg-tier app fixture's Settings singleton caches
+    # KUBEDASH_ADMIN_KUBECONFIG=<deleted tmp path>; create_app() now
+    # fail-fasts on a missing kubeconfig-file source at boot, so repoint the
+    # cached value at the fixture home's existing file (apply_overrides(None)
+    # is a no-op on reload — the stale value would otherwise win).
+    monkeypatch.setattr(
+        wsgi.get_settings(),
+        "admin_kubeconfig",
+        str(_ini_config_home / "admin.kubeconfig"),
+    )
     monkeypatch.setattr(_leader_mod, "Leader", _FakeLeader)
     # FU-1: no-op the bootstrap hook at its SOURCE (the app package) so the
     # reload's `from app import _bootstrap_local_admin` re-binds the no-op

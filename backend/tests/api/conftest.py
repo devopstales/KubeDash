@@ -40,6 +40,12 @@ def _make_fixture_home(tmp_path: pathlib.Path, bootstrap: bool = True) -> pathli
         ini += "[bootstrap]\nbootstrap_admin_email = admin@local\n"
     home = tmp_path / "home"
     home.mkdir()
+    # The INI's admin_kubeconfig must EXIST (create_app fail-fasts on a
+    # missing kubeconfig-file source at boot); content is irrelevant (the
+    # admin client build is lazy and these tests never read a cluster
+    # through it).
+    (home / "admin.kubeconfig").write_text("apiVersion: v1\n")
+    ini = ini.replace("/test/admin.kubeconfig", str(home / "admin.kubeconfig"))
     (home / "kubedash.ini").write_text(ini)
     return home
 

@@ -302,6 +302,35 @@ def test_update_denied_for_non_admin_binding(api_app, api_client, auth_client) -
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
 
 
+def test_platform_admin_updates_unbound_cluster(api_app, api_client, auth_client) -> None:
+    """The gate is "platform admin OR cluster admin": a platform admin
+    (role=admin) with no binding to the cluster can still update and delete
+    it — the opposite of the bound-viewer case above."""
+    auth_client.login()
+    assert _register(api_client, {"Authorization": f"Bearer {auth_client.jwt}"}).status_code in (
+        200,
+        201,
+    )
+    from app.core.security import issue_token_pair
+    from app.extensions import db
+    from app.models.user import User
+
+    with api_app.app_context():
+        plat = User(sub="plat", email="p@example.com", role="admin")
+        db.session.add(plat)
+        db.session.commit()
+        access, _ = issue_token_pair(plat)
+    h = {"Authorization": f"Bearer {access}"}
+    r = api_client.put(
+        "/api/v1/clusters/1",
+        json={"name": "renamed", "api_server": "https://1.2.3.4:6443", "context": "prod"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.get_json()
+    r = api_client.delete("/api/v1/clusters/1", headers=h)
+    assert r.status_code == 200
+
+
 def test_update_local_cluster_404(api_client, auth_client) -> None:
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}

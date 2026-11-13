@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import {
+  CAlert,
   CBreadcrumb,
   CBreadcrumbItem,
   CButton,
@@ -20,11 +21,13 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilPencil, cilPlus, cilTrash } from '@coreui/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import KubeDataTable, { Column } from '../../components/KubeDataTable'
 import TopMenu from '../../components/TopMenu'
 import { useCluster, type ClusterItem } from '../../hooks/useCluster'
 import { apiFetch } from '../../lib/api'
 import type { ClusterIn, ClusterUpdateIn } from '../../lib/types'
+import { useClusterStore } from '../../store/cluster'
 
 /**
  * Cluster registry — 4.1 `settings/cluster-config.html.j2` parity:
@@ -53,6 +56,8 @@ const LOCAL_CLUSTER_ID = 0
 
 const ClustersView = () => {
   const { clusters, clustersLoading, clustersError, role } = useCluster()
+  const navigate = useNavigate()
+  const setSelectedCluster = useClusterStore((s) => s.setSelectedCluster)
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ClusterItem | null>(null)
@@ -171,7 +176,20 @@ const ClustersView = () => {
           ) : clusters.length === 0 ? (
             <div className="text-center text-muted">No cluster configurations found</div>
           ) : (
-            <KubeDataTable data={clusters}>
+            <KubeDataTable
+              data={clusters}
+              onRowClick={(row, event) => {
+                // Row buttons (Edit/Delete) are their own interactions — a
+                // click on one must not also navigate the row.
+                const target = event.target instanceof HTMLElement ? event.target : null
+                if (target?.closest('button, a, input, textarea')) return
+                // 4.1 parity: a registry row opens its cluster status page.
+                // The selection store is set so the header switcher follows.
+                const cluster = row as ClusterItem
+                setSelectedCluster({ id: cluster.id, name: cluster.name })
+                navigate(`/clusters/${cluster.id}`)
+              }}
+            >
               <Column title="Context" data="context">
                 {(context: string | null, _type: unknown, row: ClusterItem) => (
                   <>
@@ -184,8 +202,11 @@ const ClustersView = () => {
                 {(apiServer: string | null | undefined) => emDash(apiServer)}
               </Column>
               <Column title="Action" data={null}>
+                {/* A platform admin OR a cluster admin (the registering
+                    user's auto-bound role, per row from the list API) can
+                    edit/delete — the backend enforces the same gate. */}
                 {(row: ClusterItem) =>
-                  isAdmin && row.id !== LOCAL_CLUSTER_ID ? (
+                  (isAdmin || row.role === 'admin') && row.id !== LOCAL_CLUSTER_ID ? (
                     <div className="d-flex flex-row gap-1">
                       <CButton
                         color="success"
@@ -213,9 +234,6 @@ const ClustersView = () => {
               </Column>
             </KubeDataTable>
           )}
-          {saveMutation.error ? (
-            <div className="text-danger mt-3">{saveMutation.error.message}</div>
-          ) : null}
           {deleteMutation.error ? (
             <div className="text-danger mt-3">{deleteMutation.error.message}</div>
           ) : null}
@@ -235,6 +253,13 @@ const ClustersView = () => {
             </CModalTitle>
           </CModalHeader>
           <CModalBody>
+            {/* A save failure keeps the modal open — the error must be
+                visible IN the dialog, not behind its overlay. */}
+            {saveMutation.error ? (
+              <CAlert color="danger" className="mb-3">
+                {saveMutation.error.message}
+              </CAlert>
+            ) : null}
             <div className="mb-3">
               <CFormLabel htmlFor="cluster-name">Name</CFormLabel>
               <CFormInput

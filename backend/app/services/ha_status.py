@@ -27,9 +27,12 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, Engine
@@ -72,12 +75,19 @@ _EXCEPTIONS_SQL = (
     "min(remote_commit_ts)) last FROM spock.exception_status"
 )
 # The leader's session-local advisory lock: pg_advisory_lock(hashtext(rid))
-# (single-integer form — app/core/leader.py) surfaces as classid = 4294967295
-# (0xFFFFFFFF as oid), objid = hashtext(rid), objsubid = 1.
+# (single-integer form — app/core/leader.py) is stored split into two 32-bit
+# halves: classid = the sign-extended upper half (4294967295 when
+# hashtext(rid) < 0, 0 when >= 0), objid = hashtext(rid)::oid (the lower
+# half), objsubid = 1. Verified live against the dev cluster 2026-11-13
+# (positive hashtext 'kubedash-x' -> classid 0; negative 'kubedash-y' ->
+# classid 4294967295) — the classid filter must follow the hash sign or the
+# lock is invisible for ~half of all replica_ids.
 _LOCK_SQL = (
     "SELECT l.pid, l.granted, a.state FROM pg_locks l "
     "JOIN pg_stat_activity a ON a.pid = l.pid "
-    "WHERE l.locktype = 'advisory' AND l.classid = 4294967295::oid "
+    "WHERE l.locktype = 'advisory' "
+    "AND l.classid = CASE WHEN hashtext(:rid) < 0 "
+    "THEN 4294967295::oid ELSE 0::oid END "
     "AND l.objid = hashtext(:rid)::oid AND l.objsubid = 1"
 )
 
@@ -300,15 +310,30 @@ def _interval_to_seconds(iv: Any) -> float:
     return float(round(iv.days * 86400 + iv.seconds + iv.microseconds / 1e6, 3))
 
 
-def _probe_engine(dsn: str, timeout_s: float) -> Engine:
+def _probe_engine(
+    dsn: str, timeout_s: float, app_url: URL | None = None
+) -> Engine:
     """Short-lived probe engine for ``dsn``. ``spock.node_interface``
     stores DSNs in libpq KEYWORD format (``host=... dbname=... user=...
     port=...``), which ``create_engine`` rejects — so detect the shape:
     a URL (contains ``://``) passes through unchanged, a keyword string
     is parsed into a ``URL``. INI overrides (F8) are always URLs; the
-    keyword path is the in-cluster default."""
+    keyword path is the in-cluster default.
+
+    The keyword path substitutes the APP's own DB credentials (F7): the
+    interface DSN's ``user`` is the cluster's internal admin (``pgedge``)
+    without a password — probing as-is fails auth and would report a
+    healthy cluster down. ``app_url`` (the app engine's URL) is the
+    credential source; host/port/dbname stay the interface DSN's.
+
+    ``statement_timeout`` bounds a WEDGED node (connection accepted,
+    query never returns) to the same budget as a connection timeout —
+    ``connect_timeout`` alone only bounds the TCP connect phase."""
+    _stmt_timeout = f"-c statement_timeout={int(timeout_s * 1000)}"
     if "://" in dsn:
-        return create_engine(dsn, connect_args={"connect_timeout": timeout_s})
+        return create_engine(
+            dsn, connect_args={"connect_timeout": timeout_s, "options": _stmt_timeout}
+        )
     params: dict[str, str] = {}
     for part in dsn.split():
         key, sep, value = part.partition("=")
@@ -319,21 +344,33 @@ def _probe_engine(dsn: str, timeout_s: float) -> Engine:
         host=params.get("host"),
         port=int(params["port"]) if params.get("port") else None,
         database=params.get("dbname"),
-        username=params.get("user"),
-        password=params.get("password"),
+        username=(app_url.username if app_url is not None else None)
+        or params.get("user"),
+        password=(app_url.password if app_url is not None else None)
+        or params.get("password"),
     )
-    return create_engine(url, connect_args={"connect_timeout": timeout_s})
+    return create_engine(
+        url, connect_args={"connect_timeout": timeout_s, "options": _stmt_timeout}
+    )
 
 
-def probe_node(dsn: str, replica_id: str, timeout_s: float = PROBE_TIMEOUT_S) -> NodeProbeData:
+def probe_node(
+    dsn: str,
+    replica_id: str,
+    timeout_s: float = PROBE_TIMEOUT_S,
+    app_url: URL | None = None,
+) -> NodeProbeData:
     """Probe one node: open a short-lived engine on its DSN, run the fixed
     read-only SQL set, close it. A failure is a RESULT (reachable=False +
     classified error), not an exception — the endpoint never 500s on the
-    thing it is there to diagnose (acceptance: it degrades, it reports)."""
+    thing it is there to diagnose (acceptance: it degrades, it reports).
+    Engine CONSTRUCTION is inside the try for the same reason: a malformed
+    catalog DSN is cluster state, not app config."""
     t0 = time.monotonic()
     node = NodeProbeData(node_name="", reachable=False)
-    engine = _probe_engine(dsn, timeout_s)
+    engine: Engine | None = None
     try:
+        engine = _probe_engine(dsn, timeout_s, app_url)
         with engine.connect() as conn:
             (row,) = conn.execute(text(_LOCAL_NODE_SQL)).fetchall()
             node_name = row[0]
@@ -343,8 +380,11 @@ def probe_node(dsn: str, replica_id: str, timeout_s: float = PROBE_TIMEOUT_S) ->
                     sub_statuses.append((r[0], r[1]))
             lag_bytes, lag_s = 0, 0.0
             for r in conn.execute(text(_LAG_SQL)).fetchall():
-                lag_bytes = int(r[2] or 0)
-                lag_s = _interval_to_seconds(r[3])
+                # spock.lag_tracker carries one row per inbound subscription
+                # (an N-node cluster: N-1 per node) — the WORST lag decides
+                # both the display and the lag_exceeded alarm.
+                lag_bytes = max(lag_bytes, int(r[2] or 0))
+                lag_s = max(lag_s, _interval_to_seconds(r[3]))
             workers = 0
             streaming = False
             for r in conn.execute(text(_APPLY_WORKERS_SQL)).fetchall():
@@ -384,7 +424,8 @@ def probe_node(dsn: str, replica_id: str, timeout_s: float = PROBE_TIMEOUT_S) ->
             elapsed_ms=int((time.monotonic() - t0) * 1000),
         )
     finally:
-        engine.dispose()
+        if engine is not None:
+            engine.dispose()
     return node
 
 
@@ -436,16 +477,25 @@ def _read_catalog(engine: Engine) -> dict[str, Any]:
 def _dsn_display(dsn: str | None) -> str:
     """``host:port`` only — the DSN carries credentials and must not leak
     into the UI (briefing: the response shows host:port + node name, never
-    the DSN string)."""
+    the DSN string). Handles both DSN shapes: URL (INI overrides) and
+    libpq keyword format (the spock.node_interface in-cluster default —
+    urlsplit cannot parse scheme-less keyword strings, so they need an
+    explicit host=/port= extraction)."""
     if not dsn:
         return ""
-    from urllib.parse import urlsplit
-
-    parts = urlsplit(dsn)
-    netloc = parts.netloc
-    if "@" in netloc:
-        netloc = netloc.rsplit("@", 1)[1]
-    return netloc or parts.path
+    if "://" in dsn:
+        netloc = urlsplit(dsn).netloc
+        if "@" in netloc:
+            netloc = netloc.rsplit("@", 1)[1]
+        return netloc
+    params: dict[str, str] = {}
+    for part in dsn.split():
+        key, sep, value = part.partition("=")
+        if sep:
+            params[key] = value
+    host = params.get("host") or ""
+    port = params.get("port") or ""
+    return f"{host}:{port}" if host and port else host
 
 
 def _own_namespace() -> str:
@@ -513,20 +563,29 @@ def build_report(
     replica_id = lease["replica_id"] if lease else None
 
     nodes: list[dict[str, Any]] = []
-    probes: list[NodeProbeData] = []
-    for name in catalog["members"]:
+
+    def _member_probe(name: str) -> NodeProbeData:
         dsn = overrides.get(name) or catalog["interfaces"].get(name)
         if dsn is None:
-            probe = NodeProbeData(node_name=name, reachable=False, probe_error="no_dsn")
-        else:
-            probe = probe_node(dsn, replica_id or "?", timeout_s=timeout_s)
-            if not probe.node_name:
-                # A dead node cannot report its own local name (the first
-                # probe statement never ran); the member list (spock.node)
-                # is authoritative for naming (F15) — the reason string must
-                # carry it (acceptance: node_unreachable:n2).
-                probe = replace(probe, node_name=name)
-        probes.append(probe)
+            return NodeProbeData(node_name=name, reachable=False, probe_error="no_dsn")
+        probe = probe_node(
+            dsn, replica_id or "?", timeout_s=timeout_s, app_url=getattr(engine, "url", None)
+        )
+        if not probe.node_name:
+            # A dead node cannot report its own local name (the first
+            # probe statement never ran); the member list (spock.node)
+            # is authoritative for naming (F15) — the reason string must
+            # carry it (acceptance: node_unreachable:n2).
+            probe = replace(probe, node_name=name)
+        return probe
+
+    members = catalog["members"]
+    # Probes run concurrently (worst case = ONE node's timeout budget, not
+    # the sum — the client re-polls every 5 s); member order is preserved.
+    with ThreadPoolExecutor(max_workers=max(1, len(members))) as ex:
+        probes = list(ex.map(_member_probe, members))
+
+    for name, probe in zip(members, probes, strict=True):
         nodes.append(
             {
                 "name": name,
@@ -573,7 +632,7 @@ def build_report(
         # derivation first: its `leader` entry is replaced by the enriched
         # one below (token / acquired_at / candidates).
         **derivation,
-        "probed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "probed_at": datetime.now(UTC).isoformat(),
         "spock_version": str(catalog["spock_version"]),
         "nodes": nodes,
         "leader": leader,

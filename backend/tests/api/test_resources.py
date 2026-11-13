@@ -887,6 +887,8 @@ class FakeK8s:
         # K8sClient.list_pod_disruption_budgets pattern). The all-namespaces
         # branch is DISTINCTLY named (team-b) so the API tests can tell the
         # branches apart, mirroring list_network_policies.
+        self.pdb_ns_calls: list[str | None] = []
+        self.pdb_ns_calls.append(namespace)
         if namespace is None:
             return [
                 {
@@ -3055,6 +3057,11 @@ def test_list_poddisruptionbudgets_sar_denied(
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "poddisruptionbudgets", "team-a", None, "policy") in asked
+    # the K8s client list call was never made (SAR asked BEFORE the read —
+    # ADR-0004): a deny must 403, not mask as a 502 on an unreachable
+    # cluster. (The fake's call log is lazily initialized by the call
+    # itself, so absence IS the proof.)
+    assert not getattr(fake_k8s, "pdb_ns_calls", [])
 
 
 def test_poddisruptionbudgets_binding_404(api_client, auth_client) -> None:

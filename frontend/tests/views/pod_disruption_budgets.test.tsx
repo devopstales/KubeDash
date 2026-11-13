@@ -54,6 +54,17 @@ const selectProd = () =>
     selectedNamespace: 'team-a',
   })
 
+const seedPdbRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'poddisruptionbudget', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 // kubernetes to_dict shape: snake_case, min_available set, status present.
 const web = {
   apiVersion: 'policy/v1',
@@ -270,4 +281,53 @@ test('list-empty-state', async () => {
 
   // first-class empty state, not an error.
   expect(await screen.findByText('No pod disruption budgets found')).toBeTruthy()
+})
+
+// The active ref (a click on web in team-a) is what bolds the row —
+// never a ?selected= param (R9). Render the list view directly (not
+// through ObjectRoute, which would swap in the detail for the seeded ref).
+test('bolds-the-opened-pdb-from-the-active-ref', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/poddisruptionbudgets', () =>
+      HttpResponse.json({
+        kind: 'poddisruptionbudgets',
+        cluster: 'prod',
+        items: [web, maxBudget],
+      }),
+    ),
+  )
+  selectProd()
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  seedPdbRef('web', 'team-a')
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/other-resource/pod-disruption-budget']}>
+        <PodDisruptionBudgetView />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+
+  const opened = await screen.findByRole('button', { name: 'web' })
+  expect(opened.className).toContain('fw-bold')
+  expect(opened.getAttribute('aria-current')).toBe('true')
+  const other = screen.getByRole('button', { name: 'max-budget' })
+  expect(other.className).not.toContain('fw-bold')
+  expect(other.getAttribute('aria-current')).toBeNull()
+})
+
+// The ?? 'default' fallback: a selected cluster with no namespace set
+// fetches ?namespace=default (the sibling shape from secrets.test.tsx).
+test('defaults-to-default-namespace-when-none-selected', async () => {
+  let requested = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/poddisruptionbudgets', ({ request }) => {
+      requested = new URL(request.url).searchParams.get('namespace') ?? ''
+      return HttpResponse.json({ kind: 'poddisruptionbudgets', cluster: 'prod', items: [] })
+    }),
+  )
+  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: null })
+  renderAt(<PodDisruptionBudgetView />)
+
+  expect(await screen.findByText('No pod disruption budgets found')).toBeTruthy()
+  expect(requested).toBe('default')
 })

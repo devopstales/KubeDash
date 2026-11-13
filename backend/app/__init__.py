@@ -23,6 +23,14 @@ def create_app(config_overrides: Mapping[str, object] | None = None) -> Flask:
     # ini_config; get_settings() then projects it.
     ini_config.apply_overrides(config_overrides)
     settings = get_settings()
+    # Fail fast at BOOT when the explicitly configured admin kubeconfig file
+    # is missing (kubeconfig-file source): without this, the failure surfaces
+    # later as 502s on every admin read, not as a boot error. The other
+    # sources (local-kubeconfig / in-cluster) have no explicit file to probe.
+    from app.services.k8s_client import admin_client_ok, resolve_admin_source
+
+    if resolve_admin_source(settings) == "kubeconfig-file" and not admin_client_ok(settings):
+        raise ini_config.ConfigError("admin_kubeconfig", "deployment", "admin_kubeconfig")
     overrides = config_overrides or {}
     app = Flask(__name__, static_folder=None, template_folder="templates")
     # The KUBEDASH_* names and the unprefixed ARCHITECTURE.md §3.8 names

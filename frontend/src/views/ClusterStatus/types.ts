@@ -54,6 +54,8 @@ export interface Queue {
   pending: number
   processing: number
   done: number
+  /** Dead letters (pgqueue.fail() after MAX_ATTEMPTS); 0 when none. */
+  failed: number
   oldest_pending_at: string | null
 }
 

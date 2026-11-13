@@ -49,7 +49,13 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/security/network-policy', title: 'Network Policies' },
   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs' },
   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
-  { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget' },
+  // PodDisruptionBudget (2026-10-28-pdb-views): real view, kept in this
+  // sweep for the title assertion (same rationale as the stale-real-view
+  // entries above) — the view's docstring cites this e2e assertion. The
+  // title is the view's card title (the sidebar label 'Pod Disruption
+  // Budget' cannot satisfy an exact match, so this pins the route
+  // registration).
+  { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget List' },
   // ResourceQuota (2026-10-28-resourcequota-views): real view, kept in this
   // sweep for the title assertion (same rationale as the stale-real-view
   // entries above) — the view's docstring cites this e2e assertion. The
@@ -141,8 +147,9 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     page,
   }) => {
     await loginAs(page)
-    // Row clicks only select the cluster in the store (no navigation); the
-    // details page is reached by URL with the selected cluster id.
+    // Row clicks select the cluster AND navigate to its status page; this
+    // test reaches the details page directly by URL (id 0 = the synthetic
+    // local cluster, always bound for the admin).
     await page.goto('/clusters/0')
 
     // The card header is a heading — target it by role, not text (the
@@ -304,6 +311,19 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
         await expect(
           page.getByRole('heading', { name: 'Configmaps List', exact: true }).first(),
         ).toBeVisible({ timeout: 20_000 })
+      } else if (path === '/settings/cluster-status') {
+        // ha-status-page (2026-11-10): the real admin view — the 'Leader
+        // Election' card header proves the route registration + report
+        // render (the sweep runs as the bootstrap admin; the API is
+        // admin-gated, so a non-admin run would redirect instead). The
+        // session-cookie fetch then pins the wire shape (the dev stack is
+        // 2-node pgEdge — both members must be reported, reachable or not).
+        await expect(
+          page.getByRole('heading', { name: 'Leader Election' }).first(),
+        ).toBeVisible({ timeout: 20_000 })
+        const report = await (await page.request.get('/api/v1/admin/ha-status')).json()
+        expect(report.status).toBeTruthy()
+        expect(report.nodes.length).toBe(2)
       }
     }
 

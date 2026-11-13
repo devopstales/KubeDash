@@ -20,7 +20,7 @@ const renderClusters = () =>
     </QueryClientProvider>,
   )
 
-const mockList = (role = 'admin') =>
+const mockList = (role = 'admin', itemRole: string | null = null) =>
   server.use(
     http.get('*/api/v1/auth/me', () =>
       HttpResponse.json({
@@ -43,6 +43,7 @@ const mockList = (role = 'admin') =>
             api_server: 'https://prod.example',
             context: 'prod-ctx',
             status: 'up',
+            role: itemRole,
           },
         ],
       }),
@@ -144,6 +145,48 @@ describe('ClustersView', () => {
     expect(screen.queryByRole('button', { name: /add cluster/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /edit prod/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /delete prod/i })).toBeNull()
+  })
+
+  test('cluster admin sees edit and delete for their own cluster', async () => {
+    // The platform role is 'user', but the binding role on the row is
+    // 'admin' (the registering user's auto-binding) — the backend allows
+    // the same, so the UI must show the row controls.
+    mockList('user', 'admin')
+    renderClusters()
+    expect(await screen.findByText('prod-ctx')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /edit prod/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /delete prod/i })).toBeTruthy()
+    // The header Add action stays platform-admin only
+    expect(screen.queryByRole('button', { name: /add cluster/i })).toBeNull()
+  })
+
+  test('save failure keeps the error visible in the dialog', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post('*/api/v1/clusters', () =>
+        HttpResponse.json(
+          { error: { code: 'INVALID_KUBECONFIG', message: 'kubeconfig has no clusters' } },
+          { status: 422 },
+        ),
+      ),
+    )
+    renderClusters()
+    expect(await screen.findByText('prod-ctx')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /add cluster/i }))
+    await user.click(screen.getByLabelText(/^name$/i))
+    await user.paste('staging')
+    await user.click(screen.getByLabelText(/config context/i))
+    await user.paste('staging-ctx')
+    await user.click(screen.getByLabelText(/api url/i))
+    await user.paste('https://staging.example')
+    await user.click(screen.getByLabelText(/kubeconfig/i))
+    await user.paste('not a mapping: []')
+    const buttons = screen.getAllByRole('button', { name: /^add cluster$/i })
+    await user.click(buttons[buttons.length - 1])
+    // The error renders IN the dialog (the modal stays open on failure),
+    // not behind its overlay in the card body.
+    expect(await screen.findByText(/kubeconfig has no clusters/)).toBeTruthy()
+    expect(screen.getByText('Create Cluster')).toBeTruthy()
   })
 
   test('empty registry renders 4.1 empty text', async () => {

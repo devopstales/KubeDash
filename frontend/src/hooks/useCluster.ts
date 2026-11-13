@@ -11,6 +11,13 @@ export interface ClusterItem {
   context?: string | null
   status?: string
   last_probe_at?: string | null
+  /**
+   * The caller's binding role on this cluster ('admin' | 'viewer' | null).
+   * The backend resolves the highest role when the user holds multiple
+   * bindings; the API enforces it independently on mutations — this drives
+   * UI button visibility only.
+   */
+  role?: string | null
 }
 
 /**

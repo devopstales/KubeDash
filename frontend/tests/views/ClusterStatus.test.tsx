@@ -6,8 +6,8 @@
  * no-leader election (degraded), the API-error banner, and the non-admin
  * route gate.
  *
- * No page-level HA banner (2026-11-12): the node and section cards sit
- * side-by-side and each card carries its own state.
+ * The page-level HA banner (acceptance R5) leads the grid: "HA <status>"
+ * + every reason; the node and section cards carry the per-section detail.
  */
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -64,6 +64,7 @@ const QUEUE = {
   pending: 1,
   processing: 0,
   done: 12,
+  failed: 0,
   oldest_pending_at: '2026-11-11 09:59:00',
 }
 
@@ -154,9 +155,9 @@ describe('ClusterStatusView', () => {
     withHandlers(HEALTHY)
     renderView()
 
-    // no page-level banner any more
+    // page-level HA banner (acceptance R5): overall status, no reasons
+    expect(await screen.findByText(/HA healthy/)).toBeTruthy()
     expect(await screen.findByText('Leader Election')).toBeTruthy()
-    expect(screen.queryByText(/HA healthy/)).toBeNull()
     // one card per node
     expect(screen.getByText('n1')).toBeTruthy()
     expect(screen.getByText('n2')).toBeTruthy()
@@ -177,9 +178,10 @@ describe('ClusterStatusView', () => {
     expect(screen.getByText('KubeDash replicas')).toBeTruthy()
     expect(screen.getByText(/1 leader of 2/)).toBeTruthy()
     expect(screen.getByText('healthy')).toBeTruthy()
-    // queue section
+    // queue section (counts by status, including the dead-letter count)
     expect(screen.getByText('Task Queue')).toBeTruthy()
     expect(screen.getByText('12')).toBeTruthy()
+    expect(screen.getByText('Failed')).toBeTruthy()
     // no reasons on a healthy banner
     expect(screen.queryByText(/node_unreachable/)).toBeNull()
   })
@@ -188,9 +190,12 @@ describe('ClusterStatusView', () => {
     withHandlers(DOWN_N2)
     renderView()
 
+    // page-level banner (acceptance R5): status + the reason, node-named
+    expect(await screen.findByText(/HA down/)).toBeTruthy()
+    expect(screen.getByText(/node_unreachable:n2/)).toBeTruthy()
     expect(await screen.findByText('Unreachable — connection_refused')).toBeTruthy()
     // the reachable node still renders its data; the healthy section shows
-    // healthy, so there is no banner-level reason left to look for
+    // healthy inside its own card (the banner reason is overall-status)
     expect(screen.getByText('n2_to_n1: replicating')).toBeTruthy()
     // replica count: the fixture reports null (no Deployment read) -> the
     // configured fallback is what the backend sends instead
@@ -201,10 +206,11 @@ describe('ClusterStatusView', () => {
     withHandlers(NO_LEADER)
     renderView()
 
-    // the election card carries the section state + its reasons (the
-    // page-level banner is gone)
-    expect(await screen.findByText('degraded')).toBeTruthy()
+    // the page-level banner carries the overall status + every reason
+    expect(await screen.findByText(/HA degraded/)).toBeTruthy()
     expect(screen.getByText('leader_heartbeat_stale, no_leader')).toBeTruthy()
+    // the election card still carries the section state
+    expect(screen.getByText('degraded')).toBeTruthy()
   })
 
   test('api-error-renders-unavailable-banner', async () => {

@@ -6,6 +6,8 @@ exemplar (now extracted to ``app/api/_authhook.py``): flask-smorest 0.47 has
 no ``Api.on_before_request``, so the hook is registered app-wide on the real
 app and scopes itself to the ``/api/v1/*`` domain routes.
 """
+from typing import Any
+
 import yaml
 from flask import g, jsonify
 from flask_smorest import Api, Blueprint
@@ -62,6 +64,24 @@ def _local_cluster() -> Cluster:
         kubeconfig_enc=b"",
         context=None,
     )
+
+
+def _require_cluster_admin(user: Any, cluster_id: int, action: str) -> None:
+    """PUT/DELETE gate: the caller must be a platform admin OR hold an
+    ``"admin"`` binding on this cluster (the registering user's
+    auto-binding). ``.first()`` — a duplicated admin binding row must not
+    500 the gate query."""
+    has_admin_binding = (
+        db.session.execute(
+            db.select(ClusterBinding).filter_by(
+                user_id=user.id, cluster_id=cluster_id, role="admin"
+            )
+        )
+        .first()
+        is not None
+    )
+    if user.role != "admin" and not has_admin_binding:
+        raise RbacDeniedError(f"only the cluster admin or a platform admin can {action}")
 
 
 class ClusterApi(Api):
@@ -131,17 +151,32 @@ class ClusterApi(Api):
     def list_clusters(self) -> object:
         """Only the caller's bound clusters — the binding gate (R3)."""
         user = g.current_user
+        # Role per cluster: a user may hold MULTIPLE bindings (template
+        # grants 'viewer', registering auto-binds 'admin') — the highest role
+        # wins; it drives the UI's manage-button gating (the API enforces it
+        # independently on mutations, so this is never a trust boundary).
+        role_map: dict[int, str] = {}
+        for cid, role in db.session.execute(
+            db.select(ClusterBinding.cluster_id, ClusterBinding.role).filter_by(
+                user_id=user.id
+            )
+        ).all():
+            if role == "admin" or cid not in role_map:
+                role_map[cid] = role
         rows = (
             db.session.execute(
                 db.select(Cluster)
-                .join(ClusterBinding, ClusterBinding.cluster_id == Cluster.id)
-                .filter(ClusterBinding.user_id == user.id)
+                .where(
+                    Cluster.id.in_(
+                        db.select(ClusterBinding.cluster_id).filter_by(user_id=user.id)
+                    )
+                )
                 .order_by(Cluster.id)
             )
             .scalars()
             .all()
         )
-        items = [_out(c) for c in rows]
+        items = [{**_out(c), "role": role_map.get(c.id)} for c in rows]
         if user.role == "admin":
             # ADR-0021 (TICKET-16): the synthetic local cluster — the cluster
             # KubeDash runs in (OD-D, reserved id 0). This block is the
@@ -183,6 +218,7 @@ class ClusterApi(Api):
                     "status": status,
                     "last_probe_at": None,
                     "source": "admin",
+                    "role": "admin",
                 },
             )
         return jsonify(items), 200
@@ -224,20 +260,15 @@ class ClusterApi(Api):
         """
         if cluster_id == LOCAL_CLUSTER_ID:
             raise ClusterNotFoundError("synthetic local cluster is not editable")
-        cluster = bound_cluster_or_404(g.current_user, cluster_id)
         user = g.current_user
-        is_platform_admin = user.role == "admin"
-        is_cluster_admin = (
-            db.session.execute(
-                db.select(ClusterBinding).filter_by(
-                    user_id=user.id, cluster_id=cluster.id, role="admin"
-                )
-            )
-            .scalar_one_or_none()
-            is not None
-        )
-        if not (is_platform_admin or is_cluster_admin):
-            raise RbacDeniedError("only the cluster admin or a platform admin can update")
+        # Gate FIRST (F020): a platform admin without a binding must reach
+        # the gate — the strict binding lookup would 404 them before the
+        # role branch is consulted. The 404 for a missing row follows the
+        # gate (a non-admin gets 403, which leaks nothing either).
+        _require_cluster_admin(user, cluster_id, "update")
+        cluster = db.session.get(Cluster, cluster_id)
+        if cluster is None:
+            raise ClusterNotFoundError("cluster not found")
         name = str(args["name"])
         duplicate = db.session.execute(
             db.select(Cluster).filter(Cluster.name == name, Cluster.id != cluster.id)
@@ -259,6 +290,9 @@ class ClusterApi(Api):
         if kubeconfig:
             cluster.kubeconfig_enc = encrypt_kubeconfig(str(kubeconfig).encode())
         db.session.commit()
+        # A rotated kubeconfig / changed api_server must not keep serving
+        # through a cached client.
+        kc.pool.invalidate(cluster.id)
         return _out(cluster)
 
     @blp.route("/clusters/<int:cluster_id>", methods=["DELETE"])
@@ -272,28 +306,21 @@ class ClusterApi(Api):
         """
         if cluster_id == LOCAL_CLUSTER_ID:
             raise ClusterNotFoundError("synthetic local cluster is not deletable")
-        cluster = bound_cluster_or_404(g.current_user, cluster_id)
         user = g.current_user
-        # Gate: the caller must be a platform admin OR hold an "admin"
-        # binding on this cluster (the registering user's auto-binding).
-        is_platform_admin = user.role == "admin"
-        is_cluster_admin = (
-            db.session.execute(
-                db.select(ClusterBinding).filter_by(
-                    user_id=user.id, cluster_id=cluster.id, role="admin"
-                )
-            )
-            .scalar_one_or_none()
-            is not None
-        )
-        if not (is_platform_admin or is_cluster_admin):
-            raise RbacDeniedError("only the cluster admin or a platform admin can delete")
+        # Gate FIRST (F020): a platform admin without a binding must reach
+        # the gate — the strict binding lookup would 404 them before the
+        # role branch is consulted.
+        _require_cluster_admin(user, cluster_id, "delete")
+        cluster = db.session.get(Cluster, cluster_id)
+        if cluster is None:
+            raise ClusterNotFoundError("cluster not found")
         # Delete bindings first (FK constraint), then the cluster row.
         db.session.execute(
             db.delete(ClusterBinding).filter_by(cluster_id=cluster.id)
         )
         db.session.delete(cluster)
         db.session.commit()
+        kc.pool.invalidate(cluster.id)
         return jsonify({"deleted": cluster.id}), 200
 
     @blp.route("/clusters/<int:cluster_id>/health", methods=["GET"])

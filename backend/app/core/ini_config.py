@@ -151,10 +151,12 @@ REQUIRED: frozenset[str] = frozenset({
 class ConfigError(Exception):
     """A required config value is absent from every source."""
 
-    def __init__(self, field: str, section: str, key: str) -> None:
+    def __init__(
+        self, field: str, section: str, key: str, reason: str = "missing required"
+    ) -> None:
         self.field, self.section, self.key = field, section, key
         super().__init__(
-            f"missing required config {field!r} (INI [{section}] {key} or env)"
+            f"{reason} config {field!r} (INI [{section}] {key} or env)"
         )
 
 
@@ -360,10 +362,12 @@ def resolve_ha_node_dsn_overrides() -> dict[str, str]:
         if (
             not sep
             or not _NODE_NAME_RE.match(name)
-            or not url.startswith("postgresql://")
+            or not url.startswith(("postgresql://", "postgres://"))
             or name in out
         ):
-            raise ConfigError("ha_node_dsn_overrides", "ha", "node_dsn_overrides")
+            # Malformed (not missing): a "missing required" message would
+            # misdiagnose a half-parsed value (StandardsLens, review 2026-11-13).
+            raise ConfigError("ha_node_dsn_overrides", "ha", "node_dsn_overrides", "malformed")
         out[name] = url
     return out
 

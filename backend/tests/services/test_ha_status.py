@@ -317,7 +317,6 @@ def _override(value: str) -> None:
 
 
 def test_dsn_overrides_empty_default() -> None:
-    assert ha_status  # noqa: B018 — import check
     assert ini_config.resolve_ha_node_dsn_overrides() == {}
 
 
@@ -377,7 +376,7 @@ def test_build_report_merges_overrides_and_assembles(
     monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: _catalog())
     seen: list[str] = []
 
-    def _fake_probe(dsn: str, rid: str, timeout_s: float = 3.0) -> NodeProbeData:
+    def _fake_probe(dsn: str, rid: str, timeout_s: float = 3.0, **_kw) -> NodeProbeData:
         seen.append(dsn)
         return node(dsn.split("@")[1].split(":")[0], lock=True)
 
@@ -412,7 +411,7 @@ def test_build_report_falls_back_to_configured_replica_count(
     a single-node run reports 1, a 3-replica Deployment reports 3."""
     monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: _catalog())
     monkeypatch.setattr(
-        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0: node("n1", lock=True)
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0, **_kw: node("n1", lock=True)
     )
 
     single = build_report(engine=None, admin_client=None, replica_count=1)
@@ -427,7 +426,7 @@ def test_build_report_detected_replicas_win_over_configured(
 ) -> None:
     monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: _catalog())
     monkeypatch.setattr(
-        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0: node("n1", lock=True)
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0, **_kw: node("n1", lock=True)
     )
     client = _FakeAdminClient(
         _pod_with_rs("local", "kubedash-abc12-def34"),
@@ -448,7 +447,7 @@ def test_build_report_member_without_dsn_is_unreachable(
     catalog["interfaces"] = {"n1": D1}  # n2 has no interface row
     monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: catalog)
     monkeypatch.setattr(
-        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0: node("n1")
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0, **_kw: node("n1")
     )
 
     report = build_report(engine=None)
@@ -471,7 +470,7 @@ def test_build_report_failed_probe_reason_carries_member_name(
     monkeypatch.setattr(
         ha_status,
         "probe_node",
-        lambda dsn, rid, timeout_s=3.0: (
+        lambda dsn, rid, timeout_s=3.0, **_kw: (
             node("n1")
             if dsn == D1
             else NodeProbeData(
@@ -546,3 +545,117 @@ def test_dsn_display() -> None:
     assert ha_status._dsn_display("postgresql://u:p@host:5432/db") == "host:5432"
     assert ha_status._dsn_display(None) == ""
     assert ha_status._dsn_display("postgresql://u:p@kdp-n2/db") == "kdp-n2"
+
+
+# --- review fixes (2026-11-13 code review, round 1) -----------------------------
+
+
+def test_dsn_display_keyword_format() -> None:
+    # The in-cluster default (spock.node_interface) is libpq KEYWORD format;
+    # only host:port may reach the UI — user=/password= never.
+    dsn = "host=n1 port=5432 dbname=kubedash user=pgedge"
+    assert ha_status._dsn_display(dsn) == "n1:5432"
+    shown = ha_status._dsn_display(dsn + " password=secret")
+    assert shown == "n1:5432"
+    assert "password" not in shown and "pgedge" not in shown
+
+
+def test_probe_engine_keyword_dsn_substitutes_app_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The keyword path probes with the APP's own DB credentials, not the
+    # cluster's internal admin (pgedge, password-less) — the interface DSN
+    # user is the cluster admin and probing as-is fails auth.
+    from sqlalchemy.engine import URL
+
+    captured: dict = {}
+
+    def _capture(url, **kw):
+        captured.update(url=url, kw=kw)
+        return object()
+
+    monkeypatch.setattr(ha_status, "create_engine", _capture)
+    app_url = URL.create("postgresql", "kubedash", "app-pass", host="h", port=5432, database="kdb")
+    ha_status._probe_engine("host=n1 port=5432 dbname=kdb user=pgedge", 3.0, app_url)
+    url = captured["url"]
+    assert url.host == "n1" and url.port == 5432 and url.database == "kdb"
+    assert url.username == "kubedash" and url.password == "app-pass"
+    assert captured["kw"]["connect_args"]["connect_timeout"] == 3.0
+
+
+def test_probe_engine_statement_timeout_bounds_wedged_node(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A wedged node (connect accepted, query stuck) must be bounded by
+    # statement_timeout too — connect_timeout only bounds the TCP phase.
+    captured: dict = {}
+
+    def _capture(url, **kw):
+        captured.update(kw=kw)
+        return object()
+
+    monkeypatch.setattr(ha_status, "create_engine", _capture)
+    ha_status._probe_engine(D1, 3.0)
+    assert "statement_timeout=3000" in captured["kw"]["connect_args"]["options"]
+    ha_status._probe_engine("host=n1 port=5432 dbname=kdb user=pgedge", 2.5)
+    assert "statement_timeout=2500" in captured["kw"]["connect_args"]["options"]
+
+
+def test_probe_node_malformed_dsn_is_a_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A malformed catalog DSN is cluster state, not app config: the probe
+    # degrades to a classified result (never raises a 500 out of the probe).
+    def _boom(url, **kw):
+        raise ValueError("Invalid IPv6 URL")
+
+    monkeypatch.setattr(ha_status, "create_engine", _boom)
+    probe = probe_node("host=n1 port=abc dbname=kdb user=u", "replica-1")
+    assert probe.reachable is False
+    assert probe.probe_error == "other:ValueError"
+
+
+def test_probe_worst_lag_wins_across_subscriptions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # An N-node cluster carries N-1 inbound subscriptions per node — the
+    # WORST lag decides the display and the alarm (no last-row-wins).
+    conn = _healthy_conn()
+    conn._by_sql["FROM spock.lag_tracker"] = [
+        ("n3", "n1", 100, None),
+        ("n2", "n1", 500, None),
+    ]
+    monkeypatch.setattr(ha_status, "create_engine", lambda dsn, **kw: _FakeEngine(conn))
+    probe = probe_node(D1, "replica-1")
+    assert probe.lag_bytes == 500
+
+
+def test_lock_sql_classid_follows_hashtext_sign() -> None:
+    # pg_advisory_lock(bigint) stores the sign-extended upper 32 bits in
+    # classid: 4294967295 for negative hashtext, 0 for positive — the filter
+    # must follow the hash sign or the lock is invisible for ~half of all
+    # replica_ids (verified live against the dev cluster 2026-11-13).
+    assert "CASE WHEN hashtext(:rid) < 0" in ha_status._LOCK_SQL
+    assert "4294967295::oid ELSE 0::oid" in ha_status._LOCK_SQL
+
+
+def test_interval_to_seconds_timedelta() -> None:
+    from datetime import timedelta
+
+    assert ha_status._interval_to_seconds(timedelta(seconds=90)) == 90.0
+    assert ha_status._interval_to_seconds(timedelta(days=1, seconds=5)) == 86405.0
+    assert ha_status._interval_to_seconds(timedelta(seconds=90, microseconds=500_000)) == 90.5
+
+
+def test_build_report_queue_carries_failed_dead_letters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # pgqueue.fail() dead-letters a row to status='failed' after
+    # MAX_ATTEMPTS — the terminal count must reach the wire (the queue
+    # section shows counts by status).
+    catalog = _catalog()
+    catalog["queue"]["failed"] = 3
+    monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: catalog)
+    monkeypatch.setattr(
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0, **_kw: node("n1")
+    )
+    report = build_report(engine=None, admin_client=None)
+    assert report["queue"]["failed"] == 3

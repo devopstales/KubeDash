@@ -28,10 +28,13 @@ def _make_fixture_home(tmp_path: Path) -> Path:
     scenarios hit a real 200 (ADR-0006)."""
     home = tmp_path / "home"
     home.mkdir()
+    # admin_kubeconfig must EXIST (create_app fail-fasts on a missing
+    # kubeconfig-file source at boot) — content is irrelevant here.
+    (home / "admin.kubeconfig").write_text("apiVersion: v1\n")
     (home / "kubedash.ini").write_text(
         "[DEFAULT]\napp_mode = development\n"
         "[database]\nurl = sqlite://\n"
-        "[deployment]\nadmin_kubeconfig = /test/admin.kubeconfig\n"
+        f"[deployment]\nadmin_kubeconfig = {home / 'admin.kubeconfig'}\n"
     )
     (home / "static").mkdir()
     (home / "static" / "assets").mkdir()

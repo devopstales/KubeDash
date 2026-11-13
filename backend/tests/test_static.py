@@ -12,6 +12,9 @@ def static_app(pg_container, tmp_path, monkeypatch):
     (static / "assets").mkdir(parents=True)
     (static / "assets" / "main.abc.js").write_text("console.log(1)")
     (static / "index.html").write_text("<html>kubedash</html>")
+    # admin_kubeconfig (override leg) must EXIST (create_app fail-fasts on a
+    # missing kubeconfig-file source at boot) — content is irrelevant here.
+    (home / "admin.kubeconfig").write_text("apiVersion: v1\n")
     (home / "kubedash.ini").write_text("[security]\njwt_secret = s\n")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     ini_config.reset()
@@ -21,7 +24,7 @@ def static_app(pg_container, tmp_path, monkeypatch):
         "DATABASE_URL": pg_container.get_connection_url(),
         "KUBEDASH_JWT_SECRET": "test-jwt-secret",
         "KUBEDASH_SECRET_KEY": "test-enc-key-32-bytes-long!!!!",
-        "KUBEDASH_ADMIN_KUBECONFIG": "/test/admin.kubeconfig",
+        "KUBEDASH_ADMIN_KUBECONFIG": str(home / "admin.kubeconfig"),
     })
     with application.app_context():
         from app.extensions import db

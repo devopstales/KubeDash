@@ -28,8 +28,11 @@ def _write_ini(home: pathlib.Path, text: str) -> pathlib.Path:
 
 
 # A complete INI: every REQUIRED key present, so create_app (which constructs
-# the full Settings and therefore fails fast on any missing REQUIRED key) boots.
-_FULL_INI = """
+# the full Settings and therefore fails fast on any missing REQUIRED key)
+# boots. ``admin_kubeconfig`` must point at an EXISTING file (create_app
+# fail-fasts on a missing kubeconfig-file source at boot) — the helper writes
+# the placeholder next to the INI.
+_FULL_INI_TMPL = """
 [DEFAULT]
 app_mode = development
 
@@ -45,8 +48,15 @@ url = sqlite://
 bootstrap_admin_email = admin@local
 
 [deployment]
-admin_kubeconfig = /test/admin.kubeconfig
+admin_kubeconfig = {admin_kc}
 """
+
+
+def _write_full_ini(home: pathlib.Path) -> pathlib.Path:
+    (home / "admin.kubeconfig").write_text("apiVersion: v1\n")
+    text = _FULL_INI_TMPL.format(admin_kc=home / "admin.kubeconfig")
+    (home / "kubedash.ini").write_text(text)
+    return home
 
 
 def test_ini_provides_value(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,7 +75,7 @@ def test_env_overrides_ini(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_override_beats_env_and_ini(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    home = _write_ini(_home(tmp_path), _FULL_INI)
+    home = _write_full_ini(_home(tmp_path))
     monkeypatch.setenv("KUBEDASH_HOME", str(home))
     monkeypatch.setenv("KUBEDASH_KUBEDASH_JWT_SECRET", "from-env")
     from app import create_app
@@ -97,7 +107,7 @@ def test_home_falls_back_to_wsgi_dir(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_static_dir_from_home_paths(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # KUBEDASH_STATIC_DIR is gone: register_static reads home_paths()["static"]
-    home = _write_ini(_home(tmp_path), _FULL_INI)
+    home = _write_full_ini(_home(tmp_path))
     (home / "static").mkdir()
     (home / "static" / "index.html").write_text("<html>spa</html>")
     monkeypatch.setenv("KUBEDASH_HOME", str(home))

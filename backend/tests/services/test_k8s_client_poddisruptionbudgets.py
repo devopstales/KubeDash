@@ -73,10 +73,19 @@ def test_get_pod_disruption_budget_404_returns_empty_list() -> None:
 
 def test_get_pod_disruption_budget_hit_returns_one_item() -> None:
     item = SimpleNamespace(to_dict=lambda: {"metadata": {"name": "web"}})
-    policy = SimpleNamespace(read_namespaced_pod_disruption_budget=lambda name, namespace: item)
+    seen: list[tuple[str, str]] = []
+
+    def read(name: str, namespace: str) -> object:
+        seen.append((name, namespace))
+        return item
+
+    policy = SimpleNamespace(read_namespaced_pod_disruption_budget=read)
     assert _client(policy).get_pod_disruption_budget("team-a", "web") == [
         {"metadata": {"name": "web"}}
     ]
+    # pin the positional order (name, namespace): a transpose would 404 on
+    # every real cluster while all value-ignoring stubs stay green.
+    assert seen == [("web", "team-a")]
 
 
 def test_get_pod_disruption_budget_other_api_error_maps_to_unreachable() -> None:

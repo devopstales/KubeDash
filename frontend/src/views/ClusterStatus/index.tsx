@@ -8,8 +8,10 @@
  * on the thing it is there to diagnose); an API error (403/500) is the
  * "status unavailable" banner.
  *
- * No page-level HA banner: the cards sit two-up and each section shows
- * its own state (node chips, the election badge + reasons).
+ * A page-level HA banner (acceptance R5: "the page shows a healthy
+ * banner" / "a down banner listing node_unreachable:n2") leads the grid
+ * with the overall status + every reason; the cards still carry the
+ * per-section detail.
  */
 import { useQuery } from '@tanstack/react-query'
 import { CBadge, CAlert, CCardBody, CCard, CCardHeader, CCardTitle, CTable } from '@coreui/react'
@@ -53,7 +55,13 @@ export const ClusterStatusView = () => {
   }
 
   return (
-    <div className="ha-status-grid">
+    <>
+      {/* Acceptance R5: the page-level banner — overall status + all reasons. */}
+      <CAlert color={STATUS_COLOR[report.status]} className="mb-4">
+        <span className="fw-bold">HA {report.status}</span>
+        {report.reasons.length > 0 ? <span> — {report.reasons.join(', ')}</span> : null}
+      </CAlert>
+      <div className="ha-status-grid">
       {report.nodes.map((node) => (
         <ClusterStatusCard key={node.name} node={node} />
       ))}
@@ -146,6 +154,10 @@ export const ClusterStatusView = () => {
                   <td className="text-muted">Done</td>
                   <td>{report.queue.done}</td>
                 </tr>
+                <tr>
+                  <td className="text-muted">Failed</td>
+                  <td>{report.queue.failed}</td>
+                </tr>
                 {report.queue.oldest_pending_at ? (
                   <tr>
                     <td className="text-muted">Oldest pending</td>
@@ -157,7 +169,8 @@ export const ClusterStatusView = () => {
           </CCardBody>
         </CCard>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

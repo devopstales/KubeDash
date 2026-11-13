@@ -35,7 +35,7 @@ from app.schemas.permissions import (
     UserPatch,
 )
 from app.services import ha_status
-from app.services.k8s_client import build_admin_client
+from app.services import k8s_client as kc
 
 
 def _stored_groups_by_user() -> dict[str, set[str]]:
@@ -292,8 +292,11 @@ class AdminApi(Api):
         owner-refs chain) is best-effort: any failure yields null (F14)."""
         require_admin()
         s = get_settings()
+        # The pool's cached admin client (require_admin guarantees the role
+        # gate); a failed BUILD degrades to candidates=null, never a 500
+        # (F14 best-effort).
         try:
-            admin_client = build_admin_client(s)
+            admin_client = kc.pool.get_admin_client(g.current_user)
         except Exception:  # noqa: BLE001 — candidates is best-effort (F14)
             admin_client = None
         # The lazy proxy hands back the raw `name=url;name=url` string

@@ -39,6 +39,7 @@ from app.core.errors import (
     ClusterAlreadyExistsError,
     ClusterNotFoundError,
     ClusterUnreachableError,
+    InvalidKubeconfigError,
 )
 from app.models.cluster import Cluster
 
@@ -200,6 +201,12 @@ class K8sClient:
             from kubernetes.config import kube_config as _kc
 
             loaded = yaml.safe_load(kubeconfig.decode())
+            # Structural validation (422 INVALID_KUBECONFIG, not a 500): a
+            # document lacking a usable cluster entry is INVALID data —
+            # without this the cluster_entry lookup below crashes with
+            # TypeError/KeyError/IndexError on first use.
+            if not isinstance(loaded, dict) or not loaded.get("clusters"):
+                raise InvalidKubeconfigError("kubeconfig has no clusters")
             client_config = k8s_client.Configuration()
             self._loader = _kc.KubeConfigLoader(loaded)  # type: ignore[no-untyped-call]
             self._loader.load_and_set(client_config)  # type: ignore[no-untyped-call]
@@ -316,9 +323,12 @@ class K8sClient:
 
     def get_pod(self, namespace: str, name: str) -> dict[str, Any] | None:
         """One pod as a dict; ``None`` on 404 (the HA status candidates
-        read treats absence as a null, not an error)."""
+        read treats absence as a null, not an error). ``_request_timeout``
+        bounds a hung apiserver — the candidates read is best-effort and
+        must not pin a worker thread indefinitely (kubernetes 37 sets no
+        default timeout)."""
         try:
-            item = self._v1.read_namespaced_pod(name, namespace)
+            item = self._v1.read_namespaced_pod(name, namespace, _request_timeout=2)
         except ApiException as e:
             if e.status == 404:
                 return None
@@ -330,7 +340,7 @@ class K8sClient:
         """One Deployment as a dict; ``None`` on 404 (same contract as
         ``get_pod``)."""
         try:
-            item = self._apps.read_namespaced_deployment(name, namespace)
+            item = self._apps.read_namespaced_deployment(name, namespace, _request_timeout=2)
         except ApiException as e:
             if e.status == 404:
                 return None
@@ -2507,6 +2517,18 @@ class K8sClientPool:
         self._admin_factory = admin_factory
         self._cache: dict[int, Any] = {}
         self._admin_cache: dict[int, Any] = {}
+
+    def get_admin_client(self, user: Any) -> Any:
+        """Public seam for admin-page endpoints (ha-status): the cached admin
+        client for the cluster KubeDash runs in, or 404 when the caller is
+        not an admin — the per-request admin build is the pool's concern,
+        never the endpoint's."""
+        return self._get_admin_client_for(user)
+
+    def invalidate(self, cluster_id: int) -> None:
+        """Drop a cached cluster client (rotated kubeconfig / changed
+        api_server after a PUT must not keep serving the old credentials)."""
+        self._cache.pop(cluster_id, None)
 
     def get(self, cluster: Any) -> Any:
         if cluster.id == LOCAL_CLUSTER_ID:

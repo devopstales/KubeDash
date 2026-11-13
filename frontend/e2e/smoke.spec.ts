@@ -9,9 +9,11 @@ import { expect, test } from '@playwright/test'
  *      auto-approve) → /api/v1/auth/callback → 302 / with HttpOnly session
  *      cookies (ADR-0025 — no token ever reaches localStorage; the SPA
  *      re-mounts on the protected shell).
- *   2. /clusters renders the bound-cluster registry.
- *   3. Register the kind cluster via the form.
- *   4. /clusters/<id> → the Pods table renders.
+ *   2. /clusters renders the "Kubernetes Server List" registry card.
+ *   3. Register the kind cluster via the Add Cluster modal.
+ *   4. Row click → /clusters/<id> → the cluster status page renders the
+ *      registry metadata (4.1 parity: a registry row opens its cluster;
+ *      Pods live at Interface → Workloads → Pods, not on this page).
  *
  * The mock OIDC (tests/e2e/oidc-mock.py) is a CI service container on port 9096.
  * The real Authlib adapter runs — unit tier monkeypatches; e2e exercises the
@@ -45,7 +47,7 @@ const KIND_KUBECONFIG = [
 test.describe('KubeDash smoke', () => {
   test.describe.configure({ timeout: 60_000 })
 
-  test('full OIDC login → clusters → pods', async ({ page }) => {
+  test('full OIDC login → clusters → cluster status', async ({ page }) => {
     // --- 1. OIDC login via the mock IdP ---
     // The SSO button is a full-document navigation (GET /api/v1/auth/login)
     // → 302 to the IdP authorize URL → the mock 302s back with
@@ -68,23 +70,30 @@ test.describe('KubeDash smoke', () => {
 
     // --- 2. Clusters view renders ---
     await page.goto('/clusters')
-    await expect(page.getByText('Bound clusters')).toBeVisible()
+    await expect(page.getByText('Kubernetes Server List')).toBeVisible()
 
-    // --- 3. Register the kind cluster ---
+    // --- 3. Register the kind cluster via the Add Cluster modal ---
+    await page.getByRole('button', { name: 'Add Cluster' }).click()
     await page.getByLabel('Name').fill('kind-e2e')
-    await page.getByLabel('API server').fill('https://127.0.0.1:6443')
+    await page.getByLabel('Kubernetes Config Context').fill('kind')
+    await page.getByLabel('Kubernetes API URL').fill('https://127.0.0.1:6443')
     await page.getByLabel('Kubeconfig').fill(KIND_KUBECONFIG)
-    await page.getByLabel('Context').fill('kind')
-    await page.getByRole('button', { name: 'Register' }).click()
+    // The modal's submit button shares the header's "Add Cluster" label —
+    // the last match in DOM order is the dialog's.
+    await page.getByRole('button', { name: /^Add Cluster$/i }).last().click()
 
-    // The registered cluster appears in the bound-cluster table.
+    // The registered cluster appears in the registry table.
     await expect(page.getByText('kind-e2e', { exact: true })).toBeVisible({
       timeout: 15_000,
     })
 
-    // --- 4. Open the cluster → Pods table ---
+    // --- 4. Row click → the cluster status page (4.1 parity). The status
+    //        card renders registry metadata; the live API probe is
+    //        best-effort (in CI the backend pod's 127.0.0.1 is not the
+    //        kind API server, so no probe-state assertion here). ---
     await page.getByText('kind-e2e', { exact: true }).click()
-    await expect(page.getByText('Pods')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Cluster status')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('cell', { name: 'kind-e2e' })).toBeVisible()
   })
 
   test('cluster list renders for a bound user', async ({ page, request }) => {
@@ -96,6 +105,6 @@ test.describe('KubeDash smoke', () => {
     })
     if (!clusters.ok()) return // no seed token configured → nothing to assert
     await page.goto('/clusters')
-    await expect(page.getByText('Bound clusters')).toBeVisible()
+    await expect(page.getByText('Kubernetes Server List')).toBeVisible()
   })
 })

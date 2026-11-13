@@ -51,11 +51,16 @@ class LeaderOut(Schema):
 
 
 class QueueOut(Schema):
-    """The ``tasks`` queue state (counts by status + oldest pending)."""
+    """The ``tasks`` queue state (counts by status + oldest pending).
+
+    ``failed`` (pgqueue dead-letters after MAX_ATTEMPTS) is 0 unless the
+    catalog read found failed rows — the field is then absent from the
+    dict, so the dump defaults it."""
 
     pending = fields.Int()
     processing = fields.Int()
     done = fields.Int()
+    failed = fields.Int(dump_default=0)
     oldest_pending_at = fields.String(allow_none=True)
 
 
