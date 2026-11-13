@@ -94,7 +94,7 @@ changes:
     # Gate Decision). report.md (QA half) + review.md in the archive
     # folder; retro half for reflect.
   2026-10-28-pdb-views:
-    phase: qa
+    phase: review
     status: in_progress
     spec: .skillgrid/change-specs/2026-10-28-pdb-views
     tracker: [TASK-048]
@@ -104,7 +104,10 @@ changes:
     # (7b3e35be). Verification floor green (unit 495 passed; vitest 16/16
     # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
     # (batch of 6): PASS after re-executed floor (qa-report.md in
-    # 2026-10-28-other-resource-views). Awaits review.
+    # 2026-10-28-other-resource-views). Reviewed 2026-11-13 (7-lens
+    # fan-out + red team): PASS with fixes — F1-F5 fixed (hunks absorbed
+    # by parallel 40df5929), M2 stale comment fixed at review, F6/F7/M1
+    # parked, F8 dropped (record: review.md). Awaits ship.
   2026-10-28-vpa-views:
     phase: qa
     status: in_progress

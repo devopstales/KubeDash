@@ -193,8 +193,8 @@ test('list-min-max-cells', async () => {
   // absent one renders "—" (certainty rule: 4.1 rendered blank). Check the
   // exact Min Available / Max Unavailable cells.
   const cells = (tr: Element | null) => Array.from(tr?.querySelectorAll('td') ?? [])
-  // The Name cell also carries the ADR-0040 share button (row affordance);
-  // compare the name button's text, not the whole cell.
+  // The Name cell carries the ADR-0040 name button (openObject); compare
+  // the data cells after slicing the Name cell off.
   const webRow = (await screen.findByRole('button', { name: 'web' })).closest('tr')
   expect(cells(webRow).map((td) => td.textContent).slice(1)).toEqual([
     'team-a',
