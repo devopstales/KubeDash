@@ -2,3 +2,7 @@ allowBuilds:
   '@parcel/watcher': true
   core-js: true
   esbuild: true
+# monaco-editor pins dompurify 3.4.15 exactly; force the SAFE_FOR_TEMPLATES
+# fix (GHSA-cg2g-xh64-v4q7, fixed in 3.4.17).
+overrides:
+  dompurify: 3.4.17
