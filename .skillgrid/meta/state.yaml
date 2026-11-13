@@ -205,6 +205,17 @@ changes:
     # command; get-token/setup/clean print "not yet implemented" pointing at
     # this blueprint; backend kubectl_auth.py is a 501 stub; no OIDC deps in
     # go.mod). Never sliced.
+  2026-10-28-runtimeclass-views:
+    phase: complete
+    status: complete
+    spec: .skillgrid/change-archive/2026-10-28-runtimeclass-views
+    # Shipped 2026-11-12 (6e4504d3); QA re-verified 2026-11-13 at b98c53cf:
+    # PASS after the Trivy fix loop (certifi 2026.10.23 + dompurify 3.4.17,
+    # 1b50a09e — first executed Trivy gate in the repo). Three-axis review
+    # 2026-11-12 (met-with-fixes, 0 Critical/Important). 13/13 scenarios,
+    # live API + browser verified. Report (QA + retro halves): report.md in
+    # the archive folder; cycle closed 2026-11-13 (reflect). W040-W041 open
+    # (SUGGESTION class).
   2026-10-28-other-resource-views:
     phase: qa
     status: in_progress

@@ -354,4 +354,142 @@ None — the machine verdict stands.
 
 ## Final-State Facts
 
-*(for reflect)*
+- **Shipped:** 2026-11-12 (`6e4504d3` — archive spec zone + state close-out), branch
+  `rebase`, single-branch delivery (no PR chain — `a9836b84`). The RuntimeClass
+  list + data views at `/other-resource/runtimeclass` (ObjectRoute shape,
+  ADR-0040) and the backend `runtimeclasses` kind (node.k8s.io, cluster-scoped,
+  SAR-gated) are in tree and live-verified 2026-11-13 (this gate).
+- **Final code state:** byte-identical to the reviewed revision
+  (`git diff 5f8d9c61..HEAD -- backend frontend cli` empty); the only tree
+  change at this gate is the dependency bump (`1b50a09e`).
+- **Navigation contract:** the spec's `?name=` query-param navigation is
+  SUPERSEDED by ADR-0040 session object refs (`NAVIGATION-SUPERSEDED.md`);
+  legacy `/data?name=` URLs one-shot-redirect to the clean route (verified
+  live 2026-11-13).
+- **Gates:** QA PASS (re-verified 2026-11-13, re-rendered after the Trivy fix
+  loop); three-axis review 2026-11-12 — floor met-with-fixes, 0 Critical /
+  0 Important pre-merge. Tracker: TASK-046 Done.
+
+## Sourced Learnings
+
+**Decisions**
+
+- The first executed Trivy gate FAILed on 2 pre-existing lockfile CRITICALs;
+  the fix landed as a gate-scoped dependency bump (`1b50a09e`) rather than a
+  separate change — tradeoff: gate speed vs change purity; both CVEs had
+  published fixes and the change's own dependency diff was empty. —
+  `report.md` Security Audit
+- The dompurify override lives in `pnpm-workspace.yaml`, not `package.json` —
+  pnpm v12 ignores the `pnpm` field (install warning); `monaco-editor@0.57.0`
+  pins `dompurify: 3.4.15` exactly (no caret), so the override is the only
+  minimal lever. — `frontend/pnpm-workspace.yaml:5-8`, `node_modules/monaco-editor/package.json:107`
+
+**Lessons**
+
+- The configmap re-verification (2026-11-12) recorded "Trivy: not configured
+  (security: absent) — manual mode", but the `security.trivy` block was
+  already present in `config.yaml` at that tree (`cc32ab72`) — a config
+  assertion carried from an earlier gate instead of read at gate time.
+  **Process bug** (reusable: any gate config read) — governs the `qa` skill's
+  config step. Open Item. — `config.yaml:50-56` vs
+  `change-specs/2026-10-28-configmap-views/report.md` Security Audit
+- No per-task RED/GREEN table or execution ledger exists for this change
+  (batch gate accepted the co-commit shape). Same retrofit class as
+  W015/W021/W030/W039 → W040. — `report.md` TDD Evidence Audit
+
+**Patterns**
+
+- **Byte-identity-to-reviewed drift check** — for re-verifying a shipped
+  change, `git diff <review-commit>..HEAD -- backend frontend cli` empty is
+  the cheapest COMPLETE-scope proof: the review's three-axis evidence
+  carries over unchanged, and the re-verification re-runs only floor +
+  live. — `report.md` Scope rows
+- **Archived-change gate record placement** — the gate record for a shipped
+  change lands in the archive folder (`report.md`); a batch-hosted change
+  keeps its original gate in the batch spec folder; the `state.yaml` entry
+  is correctly absent after ship close-out (repo convention, 6 shipped
+  changes). — `state.yaml`, `.skillgrid/change-archive/`
+
+**Surprises**
+
+- `monaco-editor` has **zero import sites** across `src/` + `tests/` — the
+  SPA bundle is byte-identical post-bump (fe-sync stamp `1b8bb654aab6…`
+  unchanged) yet Trivy still sees its exact-pinned dompurify in
+  `pnpm-lock.yaml`. Lockfile CVEs and bundle content are decoupled; a
+  dependency bump can be bundle-neutral. — fe-sync output,
+  `grep -r monaco src/ tests/` (0 hits)
+- `uv lock --upgrade-package` silently bumped the lockfile format
+  `revision = 2 → 3` — CI-safe only because `setup-uv@v3` is unpinned
+  (latest uv). A pinned-uv CI would need the pin raised with it. —
+  `backend/uv.lock:2`, `.github/workflows/ci.yaml:21`
+- **mnemonic CLI close-out UX** — `memory save` fails with an opaque
+  `FOREIGN KEY constraint failed` unless a session row exists first;
+  `memory session start` requires `--id` (undocumented — the subcommand
+  rejects `--help`); `topic-key` validation rejects hyphenated single words
+  with a misleading "at most two levels" message (plain single words pass).
+  — CLI session 2026-11-13
+
+## Acceptance Verdict
+
+**accepted** — the briefing goal (resolve the dead nav leaf to a real,
+SAR-gated, read-only list + data pair; 4.1 parity in placement/RBAC; 5.0
+PriorityClass shape) is met: 13/13 scenarios passing, every truth
+live-verified (API 5/5 probes + browser list→detail), stub removed, nav
+byte-identical. Open items are SUGGESTION-class (W040/W041) and
+cross-cutting (W037 ha-status e2e chain; the ha-status full-suite flake) —
+none touch this change's contract.
+
+## Prior-Change Follow-Through
+
+- **W008** (batch: e2e REAL_ROUTES covers only limit-range) — for
+  runtimeclass the 2026-11-12 review added a title-asserting
+  `SMOKE_STUB_ROUTES` entry instead (`0360044d`); the class is partially
+  mitigated per-kind, window stays open for the remaining kinds.
+- **W010/W012** (session-object-navigation: ui-smoke wired into `task e2e`,
+  CRD fixture) — closed before this change shipped; this change's e2e leg
+  runs inside the wired chain except for W037's serial break.
+- **W037** (ha-status `/clusters` rename breaks the e2e serial chain) —
+  still open, ha-status gate pending; this change's leg ran standalone 1/1.
+- **W022** (HPA SAR group) — still open, different kind row; the
+  runtimeclasses row verified correct at this gate.
+
+## Web-cache Promotion Candidates
+
+No web-cache promotion candidates — no web research during this change's
+span (no `web_cache` entries to select).
+
+## Environment Retro
+
+Sweep of this session only (navigation / automated checks / coding standards
+/ steering-file no-ops / tool economy / information access):
+
+| Category | Finding (sourced) | Fix lands in |
+|----------|-------------------|--------------|
+| Automated checks | Trivy gate configured (`fail_on: CRITICAL`) but not executed by ~2 weeks of gates; the configmap re-verification carried a stale "security: absent" config read | `qa` skill: read `config.yaml` at gate time, never carry config assertions between gates (Open Item — process bug) |
+| Tool economy | mnemonic CLI: `memory save` → opaque FK error without a session row; `memory session start --id` undocumented (subcommand rejects `--help`); topic-key validation message misleading for hyphenated keys | mnemonic CLI help/validation (follow-up ticket candidate) |
+| Navigation | `qa <topic>` on a shipped change: `change-specs/` glob empty, folder in `change-archive/` — a repo-wide search is required to resolve the topic | `qa` skill: one-line archived-topic resolution note (minor) |
+| Steering files | pnpm v12 ignores the `package.json` `pnpm` field (install warning); overrides belong in `pnpm-workspace.yaml` | one-off — WHY comment at `frontend/pnpm-workspace.yaml:5-8` |
+| Coding standards | none this session | — |
+| Information access | monaco-editor is a trivy-visible, bundle-invisible dependency (0 import sites) | one-off — recorded in Surprises |
+
+## Lineage
+
+- **Review** (2026-11-12, three-axis, Grade B per axis — fresh subagent
+  contexts, same model family): floor met-with-fixes; 0 Critical /
+  0 Important pre-merge; 3 Minor FIXED (`0360044d`: false e2e-smoke claim,
+  ADR-0022 stale row, empty-`{}`-overhead cell); 4 PARKED (shared-route
+  namespace coercion, 2 unasserted Then-legs, SAR cache-key — verified fixed
+  at this gate, 13 dropped candidates). — `review.md`
+- **Mnemonic observation IDs:** 13 (`2026-11-12-runtimeclass-views-review`
+  session summary). No per-artifact (briefing/blueprint/tasks) observations
+  exist for this change — consistent with W040 (no execution ledger).
+- **Gate records:** `report.md` (this file — QA half 2026-11-13) +
+  `.skillgrid/change-specs/2026-10-28-other-resource-views/qa-report.md`
+  (batch-of-6 host, 2026-10-29 PASS at `aead16a7`).
+- **Commits:** `718eda35..786100f5` (change, 4 units) · `89528a32` (ADR-0040
+  migration, separate change) · `0360044d`/`5f8d9c61` (review fix/record) ·
+  `6e4504d3` (ship) · `1b50a09e`/`e8813ac4` (this gate: deps bump, report).
+
+---
+
+*Cycle closed 2026-11-13 — reflect (session `reflect-runtimeclass-20261113`).*
