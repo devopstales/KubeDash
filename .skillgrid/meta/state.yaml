@@ -58,9 +58,9 @@ changes:
     # Open: W011 (loginToken), W013 (branch lint debt), W015-W020. Next:
     # requesting-code-review.
   2026-10-28-resourcequota-views:
-    phase: review
-    status: in_progress
-    spec: .skillgrid/change-specs/2026-10-28-resourcequota-views
+    phase: complete
+    status: complete
+    spec: .skillgrid/change-archive/2026-10-28-resourcequota-views
     tracker: [TASK-047]
     # Executed 2026-10-28 (TASK-047): 4 commits on `rebase` — backend
     # resourcequotas kind (core, namespaced, SAR-gated, 783cff0a), list
@@ -75,7 +75,12 @@ changes:
     # pin; also fixed the pre-existing ha-status-owned tsc red in
     # ui-smoke.spec.ts. Parked: R9-bold-unreachable + back-no-op
     # (ObjectRoute/session-object-navigation-owned), a11y fleet
-    # convention. review.md in the spec zone. Next: ship.
+    # convention. review.md in the spec zone. Shipped 2026-11-13 (kept
+    # branch `rebase` — no merge; integration floor re-run: this
+    # change's surface 12/12 backend + 18/18 frontend + 17/17 e2e green;
+    # the 16 branch reds adjudicated ha-status-owned in report.md's
+    # Gate Decision). report.md (QA half) + review.md in the archive
+    # folder; retro half for reflect.
   2026-10-28-pdb-views:
     phase: qa
     status: in_progress
@@ -212,7 +217,7 @@ changes:
     # spec zone on disk with a qa-report.md, recorded at phase qa per its artifacts.
 
 progress:
-  completed_changes: 29
+  completed_changes: 30
   blocked_changes: []
 
 constraints_ref: .skillgrid/projectwiki/ASSUMPTIONS.md
