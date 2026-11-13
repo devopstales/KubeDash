@@ -7,9 +7,14 @@ schema: skillgrid/state/v2
 
 changes:
   2026-11-10-ha-status-page:
-    phase: qa
+    phase: review
     status: in_progress
     spec: .skillgrid/change-specs/2026-11-10-ha-status-page
+    # First QA gate 2026-11-13: PASS after in-gate fix loop (empty node name
+    # in node_unreachable reason + regression test; W037 e2e heading ×2;
+    # deep-link csrf echo). 21/21 scenarios, live API + failure modes +
+    # browser verified on the two-node dev cluster. W042-W045 open.
+    # Report: report.md in the spec zone. Awaiting code-review.
     # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
     # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
     # active-active health (both replication directions via per-node
