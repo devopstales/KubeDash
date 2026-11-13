@@ -122,7 +122,7 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
 
     // Navigate to the cluster registry.
     await page.goto('/clusters')
-    await expect(page.getByText('Bound clusters')).toBeVisible()
+    await expect(page.getByText('Kubernetes Server List')).toBeVisible()
     // The admin sees the synthetic local cluster (ADR-0021).
     await expect(page.locator('table td', { hasText: 'local' })).toBeVisible({
       timeout: 10_000,
@@ -330,7 +330,7 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
     await loginAs(page)
     await page.goto('/definitely-not-a-route')
     await expect(page).toHaveURL(/\/clusters/, { timeout: 15_000 })
-    await expect(page.getByText('Bound clusters')).toBeVisible()
+    await expect(page.getByText('Kubernetes Server List')).toBeVisible()
   })
 
   // ADR-0040 TICKET-07 (R7): the legacy /.../data URL is a redirect, not a
@@ -425,6 +425,15 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
         input.name = 'o'
         input.value = t
         form.appendChild(input)
+        // The bounce stashes only when the form echoes the verified session
+        // CSRF token (jti; object_handoff.post_bounce) — without it the POST
+        // is a 403 and nothing is stashed, so the fresh tab renders the list.
+        const csrfMeta = document.querySelector('meta[name="kd-csrf"]')
+        const csrfInput = document.createElement('input')
+        csrfInput.type = 'hidden'
+        csrfInput.name = 'csrf'
+        csrfInput.value = csrfMeta?.content ?? ''
+        form.appendChild(csrfInput)
         form.style.display = 'none'
         document.body.appendChild(form)
         form.submit()

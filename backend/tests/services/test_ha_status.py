@@ -459,6 +459,34 @@ def test_build_report_member_without_dsn_is_unreachable(
     assert "node_unreachable:n2" in report["reasons"]
 
 
+def test_build_report_failed_probe_reason_carries_member_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A stopped node cannot report its own local name — probe_node returns
+    # node_name="" — but the reason string must still carry the member name
+    # from spock.node (acceptance: node_unreachable:n2, never the bare
+    # "node_unreachable:").
+    catalog = _catalog()
+    monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: catalog)
+    monkeypatch.setattr(
+        ha_status,
+        "probe_node",
+        lambda dsn, rid, timeout_s=3.0: (
+            node("n1")
+            if dsn == D1
+            else NodeProbeData(
+                node_name="", reachable=False, probe_error="connection_refused"
+            )
+        ),
+    )
+
+    report = build_report(engine=None)
+
+    assert report["status"] == "down"
+    assert "node_unreachable:n2" in report["reasons"]
+    assert not any(r == "node_unreachable:" for r in report["reasons"])
+
+
 # --- candidates (best-effort owner-refs chain) ---------------------------------------
 
 

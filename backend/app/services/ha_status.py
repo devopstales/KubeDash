@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -520,6 +520,12 @@ def build_report(
             probe = NodeProbeData(node_name=name, reachable=False, probe_error="no_dsn")
         else:
             probe = probe_node(dsn, replica_id or "?", timeout_s=timeout_s)
+            if not probe.node_name:
+                # A dead node cannot report its own local name (the first
+                # probe statement never ran); the member list (spock.node)
+                # is authoritative for naming (F15) — the reason string must
+                # carry it (acceptance: node_unreachable:n2).
+                probe = replace(probe, node_name=name)
         probes.append(probe)
         nodes.append(
             {
