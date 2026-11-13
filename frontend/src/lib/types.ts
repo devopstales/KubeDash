@@ -249,8 +249,8 @@ export interface ConfigMapItem {
   }
   /** Plain-string config values (public, NOT base64). */
   data?: Record<string, string> | null
-  /** Base64-encoded binary values (camelCase — the kubernetes client preserves the API casing for non-metadata fields). */
-  binaryData?: Record<string, string> | null
+  /** Base64-encoded binary values (snake_case on the wire — to_dict emits ``binary_data``). */
+  binary_data?: Record<string, string> | null
   [key: string]: unknown
 }
 

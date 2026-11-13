@@ -89,10 +89,19 @@ def test_get_configmap_hit_returns_one_item_with_data() -> None:
             "data": {"LOG_LEVEL": "info"},
         }
     )
-    v1 = SimpleNamespace(read_namespaced_config_map=lambda name, namespace: item)
+    seen: list[tuple[str, str]] = []
+
+    def read(name: str, namespace: str) -> object:
+        seen.append((name, namespace))
+        return item
+
+    v1 = SimpleNamespace(read_namespaced_config_map=read)
     assert _client(v1).get_configmap("team-a", "app-config") == [
         {"metadata": {"name": "app-config", "namespace": "team-a"}, "data": {"LOG_LEVEL": "info"}}
     ]
+    # pin the positional order (name, namespace): a transpose would 404 on
+    # every real cluster while all value-ignoring stubs stay green.
+    assert seen == [("app-config", "team-a")]
 
 
 def test_get_configmap_other_api_error_maps_to_unreachable() -> None:

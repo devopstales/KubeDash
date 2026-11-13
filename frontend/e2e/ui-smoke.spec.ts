@@ -281,6 +281,24 @@ test.describe.serial('KubeDash UI smoke (local admin)', () => {
         await expect(
           page.getByRole('heading', { name: 'Persistent Volume List', exact: true }).first(),
         ).toBeVisible({ timeout: 20_000 })
+      } else if (path === '/storage/configmap') {
+        // configmap-stub-removed-and-routes-wired: the real view's card
+        // title EXACT — 'Configmaps List' (4.1's casing verbatim). Pins the
+        // App.tsx Route registration the mount-only sweep cannot: delete the
+        // route (or typo its kind) and the catch-all redirects to /clusters
+        // instead of this heading.
+        const clBody = await (await page.request.get('/api/v1/clusters')).json()
+        const cluster = (clBody.items ?? clBody)[0]
+        await page.evaluate((c) => {
+          localStorage.setItem(
+            'kd-cluster-scope',
+            JSON.stringify({ state: { selectedCluster: c, selectedNamespace: null }, version: 0 }),
+          )
+        }, cluster)
+        await page.goto(path)
+        await expect(
+          page.getByRole('heading', { name: 'Configmaps List', exact: true }).first(),
+        ).toBeVisible({ timeout: 20_000 })
       }
     }
 

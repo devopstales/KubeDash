@@ -55,6 +55,17 @@ const selectProd = () =>
     selectedNamespace: 'team-a',
   })
 
+const seedConfigmapRef = (name: string, namespace: string) => {
+  const token = 'testref1'
+  sessionStorage.setItem(
+    'kd_object_refs',
+    JSON.stringify({
+      [token]: { kind: 'configmap', name, namespace, ts: Date.now(), origin: 'click' },
+    }),
+  )
+  sessionStorage.setItem('kd_object_active', token)
+}
+
 // kubernetes to_dict shape: snake_case, 2 data keys + the kubectl noise
 // annotation (rendered verbatim on the data page, not here).
 const appConfig = {
@@ -107,7 +118,7 @@ const binaryOnly = {
     namespace: 'team-a',
     creation_timestamp: '2026-01-05T00:00:00Z',
   },
-  binaryData: { icon: 'aWtl' },
+  binary_data: { icon: 'aWtl' },
 }
 
 // The row's own namespace differs from the store's: the openObject ref must
@@ -236,10 +247,61 @@ test('list-never-counts-binarydata', async () => {
   selectProd()
   renderAt(<ConfigMapView />)
 
-  // The count is data-only: binaryData keys are NOT counted (4.1's list
+  // The count is data-only: binary_data keys are NOT counted (4.1's list
   // read projected only `data`).
   expect(await screen.findByRole('button', { name: 'binary-only' })).toBeTruthy()
   expect(dataKeysOf('binary-only')).toBe('—')
+})
+
+// R9: the active ref (never a `?selected=` param) bolds the opened row —
+// the sibling shape from secrets.test.tsx.
+test('bolds-the-opened-configmap-from-the-active-ref', async () => {
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/configmaps', () =>
+      HttpResponse.json({
+        kind: 'configmaps',
+        cluster: 'prod',
+        items: [appConfig, { metadata: { name: 'other' }, data: {} }],
+      }),
+    ),
+  )
+  selectProd()
+  // The active ref (a click on app-config in team-a) is what bolds the row
+  // — never a `?selected=` param (R9). Render the list view directly (not
+  // through ObjectRoute, which would swap in the detail for the seeded ref).
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  seedConfigmapRef('app-config', 'team-a')
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/storage/configmap']}>
+        <ConfigMapView />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+
+  const opened = await screen.findByRole('button', { name: 'app-config' })
+  expect(opened.className).toContain('fw-bold')
+  expect(opened.getAttribute('aria-current')).toBe('true')
+  const other = screen.getByRole('button', { name: 'other' })
+  expect(other.className).not.toContain('fw-bold')
+  expect(other.getAttribute('aria-current')).toBeNull()
+})
+
+// The `?? 'default'` fallback: a selected cluster with no namespace set
+// fetches ?namespace=default (the sibling shape from secrets.test.tsx).
+test('defaults-to-default-namespace-when-none-selected', async () => {
+  let requested = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/configmaps', ({ request }) => {
+      requested = new URL(request.url).searchParams.get('namespace') ?? ''
+      return HttpResponse.json({ kind: 'configmaps', cluster: 'prod', items: [] })
+    }),
+  )
+  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: null })
+  renderAt(<ConfigMapView />)
+
+  expect(await screen.findByText('No configmaps found')).toBeTruthy()
+  expect(requested).toBe('default')
 })
 
 // list-no-cluster-state

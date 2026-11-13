@@ -36,9 +36,9 @@ const NOT_FOUND = 'not found'
  * block. The read is a SINGLE `?name=&namespace=` fetch (not 4.1's
  * list-then-filter); empty `items` is a not-found STATE (pinned copy), not
  * an error. 4.1 deviations (briefing.md): the "Lables" typo is NOT
- * replicated (Labels); trimAnnotations is NOT replicated (annotations
- * render verbatim, including last-applied-configuration — unlike the
- * Secret view); the per-key value is plain `<pre><code>` text — NO base64
+ * replicated (Labels); trimAnnotations IS replicated (2026-11-05 per user
+ * request — the two machine-managed keys are trimmed before render); the
+ * per-key value is plain `<pre><code>` text — NO base64
  * decode, NO `secretLanguage` heuristic (ConfigMap `data` values are plain
  * strings, unlike a Secret's base64 `data`; the `SecretValue` component's
  * decode + eye toggle is Secret-only).

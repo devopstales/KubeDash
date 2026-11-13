@@ -3490,6 +3490,11 @@ def test_list_configmaps_sar_denied(api_client, auth_client, fake_k8s, monkeypat
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     # core group + the namespace are the load-bearing assertions:
     assert ("list", "configmaps", "team-a", None, "") in asked
+    # the K8s client list call was never made (SAR asked BEFORE the read —
+    # ADR-0004): a deny must 403, not mask as a 502 on an unreachable
+    # cluster. (The fake's call log is lazily initialized by the call
+    # itself, so absence IS the proof.)
+    assert not getattr(fake_k8s, "configmap_ns_calls", [])
 
 
 def test_configmaps_binding_404(api_client, auth_client) -> None:

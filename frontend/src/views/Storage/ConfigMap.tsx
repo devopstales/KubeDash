@@ -37,7 +37,7 @@ const toRow = (item: ConfigMapItem, namespace: string): ConfigMapRow => ({
   // Name/Created only; this is the one ratified addition — the count is
   // free because ``data`` is on the list read, NOT stripped, unlike
   // secrets). ``0`` is a valid count (rendered as "0", NOT "—"); "—" only
-  // when ``data`` is entirely absent. ``binaryData`` is NOT counted
+  // when ``data`` is entirely absent. ``binary_data`` is NOT counted
   // (4.1's list read projected only ``data``).
   dataKeys: item.data == null ? '—' : String(Object.keys(item.data).length),
   created: formatTimestamp(item.metadata?.creation_timestamp),
