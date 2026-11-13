@@ -114,40 +114,6 @@ changes:
     # targeted; fe-build + fe-check; _nav.tsx untouched). QA 2026-10-29
     # (batch of 6): PASS after re-executed floor (qa-report.md in
     # 2026-10-28-other-resource-views). Awaits review.
-  2026-10-28-configmap-views:
-    phase: qa
-    status: in_progress
-    spec: .skillgrid/change-specs/2026-10-28-configmap-views
-    tracker: [TASK-064]
-    # Executed 2026-11-04 (TASK-064): 4 commits on `rebase`
-    # (41620987..c966685e) — backend configmaps kind (core, namespaced,
-    # SAR-gated), list view (data-keys column), data view (per-key data
-    # table + JSON block), ObjectRoute wiring + stub removal. 2026-11-05
-    # T2: trimAnnotations replicated (adr.md OVERRIDE note). QA gate
-    # 2026-11-12: **PASS** (report.md — 17/17 scenarios, floor re-run at
-    # tip: backend 888/888, targeted vitest 18/18, fe-build + fe-check,
-    # zero ruff/mypy in configmap files, e2e real-routes leg 1/1
-    # standalone incl. /storage/configmap; live API + browser
-    # verification on kubedash.dev.local:8080 — demo-config Data Keys
-    # "3", click→detail at clean URL, data table + JSON block). 1 WARNING
-    # out-of-scope (W037: the ha-status /clusters WIP breaks the full
-    # `task e2e` serial chain), 2 SUGGESTION (W038 blueprint file-list
-    # drift, W039 no execution ledger). Re-verified 2026-11-12 at
-    # cc32ab72 (15 commits of drift: ha-status code committed, 4
-    # ship/archive commits, .skillgrid restore): configmap code
-    # byte-identical since the gate; floor + e2e leg re-run green;
-    # W037 re-confirmed open (ha-status gate pending); PASS unchanged.
-    # Reviewed 2026-11-13 (7-lens + red team; review.md): met-with-fixes,
-    # 0 unfixed Important. 9 ledger rows fixed this pass (binary_data wire
-    # shape, stale trim docstring, feature-file amendment, get_configmap
-    # arg-order pin, R9 bold test, default-ns test, e2e exact-title case,
-    # SAR call-log assert); 5 parked (cross-cutting dead-R9-bold →
-    # ObjectRoute change, kind-integration backstop follow-up, Security Low
-    # data-in-list documented intent, Performance ×2 ratified design,
-    # EdgeCases potential-only). Floor re-run green (vitest 15/15, tsc,
-    # ruff, pytest -k configmap 12/12, fe-build/fe-check, e2e real-routes
-    # 1/1 incl. the new /storage/configmap title case).
-    # Next: ship.
   2026-11-06-mcp-server:
     phase: research
     status: in_progress
@@ -234,7 +200,7 @@ changes:
     # spec zone on disk with a qa-report.md, recorded at phase qa per its artifacts.
 
 progress:
-  completed_changes: 28
+  completed_changes: 29
   blocked_changes: []
 
 constraints_ref: .skillgrid/projectwiki/ASSUMPTIONS.md
