@@ -117,7 +117,7 @@ changes:
     # (report.md in the archive; integration floor re-run green: unit
     # 902, e2e 17/17; branch kept per repo ship rule).
   2026-10-28-vpa-views:
-    phase: qa
+    phase: review
     status: in_progress
     spec: .skillgrid/change-specs/2026-10-28-vpa-views
     tracker: [TASK-049]
@@ -128,7 +128,21 @@ changes:
     # (unit 507 passed; vitest 17/17 targeted; fe-build + fe-check;
     # _nav.tsx untouched). QA 2026-10-29 (batch of 6): PASS after
     # re-executed floor (qa-report.md in 2026-10-28-other-resource-views).
-    # Awaits review.
+    # Reviewed 2026-11-15 (7-lens fan-out + red team): MET-WITH-FIXES,
+    # 0 CRITICAL — 2 Important (stored XSS via the shared KubeDataTable
+    # DataTables cell sink, fixed at the sink with 4 real-component tests;
+    # literal '<br/>' text in multi-resource bound cells, fixed with the
+    # PDB element idiom + TDD) + 6 verification pins (list 502 both tiers,
+    # served-version authority, list-error-state, SAR call-absence,
+    # scope-authority, ?? 'default') + 3 minors (orphaned comment, dup
+    # React keys x2, stale docstring) — all fixed in the companion
+    # code-zone commit. Floor note: branch ruff 62 / mypy 66 red is
+    # ha-status-owned (448db3d4/30ee933f, proven pre-existing with this
+    # review's diff stashed); this review's files are clean. Parked:
+    # namespace-less-ref all-N/A detail, sentinel drift, a11y fleet x3,
+    # red-team fleet x3 (ObjectRoute deep-link pin, R9 bold dead,
+    # kd_object_refs growth), verif fleet x2. review.md in the spec zone.
+    # Next: ship.
   2026-10-28-hpa-views:
     phase: qa
     status: in_progress
