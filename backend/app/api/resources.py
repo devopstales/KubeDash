@@ -107,10 +107,6 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # resolved by TASK-048 (list + data views; ADR-0022 placement). The 4.1
     # route name was singular; the API kind is the plural.
     "poddisruptionbudgets": ("list_pod_disruption_budgets", "poddisruptionbudgets", "policy"),
-    # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD) — the 4.1-parity
-    # nav leaf resolved by TASK-049 (list + data views; ADR-0022 placement).
-    # Full custom object (the Cilium CRD seam): the CRD's own served version is
-    # the authority, CRD absent -> [] (first-class empty state).
     # GatewayClass (gateway.networking.k8s.io, cluster-scoped CRD) — the
     # ingressclass-gatewayclass-views change (list + data views; ADR-0022
     # placement). Full custom object (the VPA/CRD seam): the CRD's own served
@@ -126,6 +122,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # ReferenceGrants (gateway.networking.k8s.io, cluster-scoped CRD) — the
     # ingress-gateway-api-views change (list + data views; ADR-0022 placement).
     "referencegrants": ("list_reference_grants", "referencegrants", "gateway.networking.k8s.io"),
+    # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD) — the 4.1-parity
+    # nav leaf resolved by TASK-049 (list + data views; ADR-0022 placement).
+    # Full custom object (the Cilium CRD seam): the CRD's own served version is
+    # the authority, CRD absent -> [] (first-class empty state).
     "verticalpodautoscalers": (
         "list_vertical_pod_autoscalers",
         "verticalpodautoscalers",

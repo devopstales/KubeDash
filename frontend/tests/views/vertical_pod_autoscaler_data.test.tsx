@@ -193,6 +193,51 @@ test('vpa-data-container-policies', async () => {
   expect(screen.getByText('cpu, memory')).toBeTruthy()
 })
 
+test('vpa-data-multi-resource-bounds-render-real-line-breaks', async () => {
+  // The standard cpu+memory bound: two "resource: value" lines separated
+  // by a REAL <br /> element — the 4.1 port's join('<br/>') rendered the
+  // literal string as visible text (review 2026-10-28-vpa-views).
+  const multiBounds = {
+    ...webVpa,
+    spec: {
+      ...webVpa.spec,
+      resourcePolicy: {
+        containerPolicies: [
+          {
+            containerName: 'app',
+            controlledValues: 'RequestsLimits',
+            mode: 'Auto',
+            minAllowed: { cpu: '100m', memory: '128Mi' },
+            maxAllowed: { cpu: '2', memory: '4Gi' },
+            controlledResources: ['cpu', 'memory'],
+          },
+        ],
+      },
+    },
+    status: {},
+  }
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
+      HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [multiBounds] }),
+    ),
+  )
+  selectProd()
+  seedActiveRef('web-vpa', 'team-a')
+  const { container } = renderAt(<VerticalPodAutoscalerDataView name="web-vpa" namespace="team-a" />)
+
+  await screen.findByText('app', { selector: 'td' })
+  // A real <br /> element separates the two lines inside the bounds cell
+  // (the lines are split text nodes — no element carries one line whole).
+  const boundsCells = Array.from(container.querySelectorAll('table td')).filter((td) =>
+    td.textContent?.includes('cpu: 100m'),
+  )
+  expect(boundsCells.length).toBeGreaterThan(0)
+  expect(boundsCells[0].textContent).toContain('memory: 128Mi')
+  expect(boundsCells[0].querySelector('br')).not.toBeNull()
+  // The literal 4.1 join string must not survive as visible text.
+  expect(container.textContent).not.toContain('<br/>')
+})
+
 test('vpa-data-empty-vs-absent-bounds', async () => {
   // A present-but-empty minAllowed object is NOT an absent bound: it
   // renders —, while a truly absent bound renders 4.1's N/A literal.

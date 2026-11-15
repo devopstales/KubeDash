@@ -263,3 +263,44 @@ test('vpa-list-empty-state', async () => {
   // from "operator not installed" — one pinned empty-state copy.
   expect(await screen.findByText('No vertical pod autoscalers found')).toBeTruthy()
 })
+
+test('vpa-list-error-state', async () => {
+  // A 403 (or 502) body carries no `items`, so without the queryFn's
+  // `if (r.error) throw` the page would render the empty state instead of
+  // the red error — this pins that the failure renders as a failure.
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
+      HttpResponse.json(
+        { error: { code: 'RBAC_DENIED', message: 'list on verticalpodautoscalers' } },
+        { status: 403 },
+      ),
+    ),
+  )
+  selectProd()
+  renderAt(<VerticalPodAutoscalerView />)
+
+  expect(
+    await screen.findByText(
+      /Error loading vertical pod autoscalers: RBAC_DENIED: list on verticalpodautoscalers/,
+    ),
+  ).toBeTruthy()
+  // no blank table, no rows.
+  expect(screen.queryAllByRole('button', { name: 'web-vpa' })).toHaveLength(0)
+})
+
+test('vpa-list-defaults-to-default-namespace-when-none-selected', async () => {
+  // `?? 'default'`: a selected cluster with no selected namespace lists
+  // 'default' (the sibling list-view contract).
+  let requested = ''
+  server.use(
+    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', ({ request }) => {
+      requested = new URL(request.url).searchParams.get('namespace') ?? ''
+      return vpaListResponse([])
+    }),
+  )
+  useClusterStore.setState({ selectedCluster: { id: 1, name: 'prod' }, selectedNamespace: null })
+  renderAt(<VerticalPodAutoscalerView />)
+
+  expect(await screen.findByText('No vertical pod autoscalers found')).toBeTruthy()
+  expect(requested).toBe('default')
+})

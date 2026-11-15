@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CBreadcrumb,
@@ -38,13 +39,26 @@ const bounds = (b?: Record<string, string>) => {
   return entries.length > 0 ? entries : ['—']
 }
 
+// Render bound lines ("resource: value") with real <br /> breaks. The 4.1
+// port joined with a literal '<br/>' string, which the DOM shows as visible
+// text (the standard cpu+memory bound rendered two lines of junk); the
+// element form is the 5.0 idiom (the PDB selector cell).
+const boundLines = (lines: string[]) =>
+  lines.map((line, i) => (
+    <Fragment key={i}>
+      {line}
+      {i < lines.length - 1 && <br />}
+    </Fragment>
+  ))
+
 /**
  * 4.1 `other-resources/vpa-data.html.j2` port: one VerticalPodAutoscaler's
  * metadata plus the 4.1 Container Policies + Conditions tables, and the
  * full object as a syntax-highlighted block (`JSON.stringify` — the block
  * is JSON text with the truthful `json` highlighter). The read is a SINGLE
- * `?name=&namespace=` fetch (4.1's list-then-filter is dropped; the list
- * view's name links are the sole producer of these query strings). The
+ * `?name=&namespace=` fetch (4.1's list-then-filter is dropped; identity
+ * arrives as props from ObjectRoute — the active ref — and the legacy /data
+ * redirect passes the query params through as props). The
  * kind is a namespaced CRD (autoscaling.k8s.io, full custom object,
  * camelCase — the Cilium seam). The Conditions table reads
  * `status.conditions` — 4.1 iterated a top-level `conditions` key its read
@@ -222,12 +236,12 @@ const VerticalPodAutoscalerDataView = ({
                   </tr>
                 ) : (
                   policies.map((cp, i) => (
-                    <tr key={cp?.containerName ?? i}>
+                    <tr key={`${i}:${cp?.containerName ?? ''}`}>
                       <td>{cp?.containerName ?? 'N/A'}</td>
                       <td>{cp?.controlledValues ?? 'N/A'}</td>
                       <td>{cp?.mode ?? 'N/A'}</td>
-                      <td>{bounds(cp?.minAllowed).join('<br/>')}</td>
-                      <td>{bounds(cp?.maxAllowed).join('<br/>')}</td>
+                      <td>{boundLines(bounds(cp?.minAllowed))}</td>
+                      <td>{boundLines(bounds(cp?.maxAllowed))}</td>
                       <td>{cp?.controlledResources?.join(', ') || 'N/A'}</td>
                     </tr>
                   ))
@@ -253,7 +267,7 @@ const VerticalPodAutoscalerDataView = ({
                   </tr>
                 ) : (
                   conditions.map((c, i) => (
-                    <tr key={c?.type ?? i}>
+                    <tr key={`${i}:${c?.type ?? ''}`}>
                       <td>{c?.type ?? 'N/A'}</td>
                       <td>{c?.status ?? 'N/A'}</td>
                       <td>{c?.lastTransitionTime ?? 'N/A'}</td>

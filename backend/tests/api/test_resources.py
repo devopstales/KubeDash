@@ -940,6 +940,8 @@ class FakeK8s:
         # the FULL custom object (spec + status) is returned (camelCase). The
         # all-namespaces branch is DISTINCTLY named (team-b) so the API tests
         # can tell the branches apart, mirroring list_network_policies.
+        if getattr(self, "vpa_unreachable", False):
+            raise ClusterUnreachableError("vpa cluster unreachable (test)")
         self.vpa_ns_calls: list[str | None] = []
         self.vpa_ns_calls.append(namespace)
         if namespace is None:
@@ -3177,6 +3179,30 @@ def test_list_verticalpodautoscalers_sar_denied(
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     assert ("list", "verticalpodautoscalers", "team-a", None, "autoscaling.k8s.io") in asked
+    # The SAR deny short-circuits BEFORE the client read (sibling idiom): no
+    # list call was made.
+    assert not getattr(fake_k8s, "vpa_ns_calls", [])
+
+
+def test_list_verticalpodautoscalers_502_on_unreachable(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """A CRD-read transport failure surfaces as 502 CLUSTER_UNREACHABLE
+    (the shared CLUSTER_UNREACHABLE error code — pinned here, not just at
+    the service tier, mirroring the Cilium seam)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    # Model an unreachable apiserver for the VPA read (the fake's default
+    # models it reachable).
+    fake_k8s.vpa_unreachable = True
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a",
+        headers=h,
+    )
+    assert r.status_code == 502
+    assert r.get_json()["error"]["code"] == "CLUSTER_UNREACHABLE"
 
 
 def test_verticalpodautoscalers_binding_404(api_client, auth_client) -> None:

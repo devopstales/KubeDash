@@ -9,11 +9,11 @@ from app.services.k8s_client import K8sClient
 _VERSION = "v1"
 
 
-def _client(custom: object) -> K8sClient:
+def _client(custom: object, served: tuple[str, str] = (_VERSION, "Namespaced")) -> K8sClient:
     client = object.__new__(K8sClient)
     client._custom = lambda: custom
     # The CRD is present and served (the absent case is tested separately).
-    client.get_crd_served = lambda group, plural: (_VERSION, "Namespaced")
+    client.get_crd_served = lambda group, plural: served
     return client
 
 
@@ -102,6 +102,54 @@ def test_list_vertical_pod_autoscalers_crd_absent_is_empty() -> None:
     client.get_crd_served = lambda group, plural: None
     assert client.list_vertical_pod_autoscalers("team-a") == []
     assert seen == []  # the list call was never made
+
+
+def test_list_vertical_pod_autoscalers_maps_500_to_unreachable() -> None:
+    """A transport error on the custom-object LIST maps to
+    ClusterUnreachableError (502), mirroring the get-path pin and the
+    Cilium seam's list error map."""
+
+    def list_ns(group, version, namespace, plural):
+        raise ApiException(status=500)
+
+    with pytest.raises(ClusterUnreachableError):
+        _client(SimpleNamespace(list_namespaced_custom_object=list_ns)).list_vertical_pod_autoscalers(
+            "team-a"
+        )
+
+
+def test_list_vertical_pod_autoscalers_uses_served_version_not_hardcoded() -> None:
+    """The CRD's OWN served version is the authority: a non-``v1`` served
+    version is forwarded to the custom-object list (mirroring the Cilium
+    sibling's ``v2alpha1`` pin). A hardcoded ``"v1"`` would 404 on a
+    v1beta1-only cluster with the CRD + objects present."""
+    seen: list[object] = []
+    vpa = _vpa("web-vpa", "team-a")
+    custom = SimpleNamespace(
+        list_namespaced_custom_object=lambda group, version, namespace, plural: (
+            seen.append((group, version, namespace, plural)),
+            {"items": [vpa]},
+        )[1],
+    )
+    _client(custom, served=("v1beta1", "Namespaced")).list_vertical_pod_autoscalers("team-a")
+    assert seen == [("autoscaling.k8s.io", "v1beta1", "team-a", "verticalpodautoscalers")]
+
+
+def test_list_vertical_pod_autoscalers_cluster_scoped_revision_ignores_namespace() -> None:
+    """A future cluster-scoped CRD revision: a namespace is accepted and
+    ignored (the ``list_cluster_custom_object`` branch, mirroring the
+    VolumeSnapshot sibling's scope-authority pin)."""
+    seen: list[object] = []
+    vpa = _vpa("web-vpa", "team-a")
+    custom = SimpleNamespace(
+        list_cluster_custom_object=lambda group, version, plural: (
+            seen.append((group, version, plural)),
+            {"items": [vpa]},
+        )[1],
+    )
+    result = _client(custom, served=("v1", "Cluster")).list_vertical_pod_autoscalers("team-a")
+    assert result[0]["metadata"]["name"] == "web-vpa"
+    assert seen == [("autoscaling.k8s.io", "v1", "verticalpodautoscalers")]
 
 
 def test_get_vertical_pod_autoscaler_404_returns_empty_list() -> None:
