@@ -86,3 +86,7 @@ class HaStatusOut(Schema):
     reasons = fields.List(fields.String())
     database = fields.Nested(SectionOut)
     election = fields.Nested(SectionOut)
+    # Config warnings (W049d: a typo'd node_dsn_overrides name is dead
+    # config otherwise) — [] when none; dump_default so a report dict
+    # without the key still dumps the field.
+    warnings = fields.List(fields.String(), dump_default=[])

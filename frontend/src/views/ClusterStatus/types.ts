@@ -74,4 +74,6 @@ export interface HaReport {
   reasons: string[]
   database: HaSection
   election: HaSection
+  /** Config warnings (e.g. a typo'd node_dsn_overrides name) — [] when none. */
+  warnings: string[]
 }

@@ -45,7 +45,11 @@ export const ClusterStatusView = () => {
   if (query.isLoading) {
     return <div className="text-center text-muted py-5">Loading cluster status…</div>
   }
-  if (query.error || !report) {
+  // No report yet: an initial-load failure is the "unavailable" banner.
+  // A LATER (refetch) failure with a report in hand renders the grid below
+  // plus a stale-data banner — a transient 500 must not hide the last good
+  // report (W049f).
+  if (!report) {
     return (
       <CAlert color="danger">
         Cluster status unavailable
@@ -56,11 +60,21 @@ export const ClusterStatusView = () => {
 
   return (
     <>
-      {/* Acceptance R5: the page-level banner — overall status + all reasons. */}
-      <CAlert color={STATUS_COLOR[report.status]} className="mb-4">
+      {query.error ? (
+        <CAlert color="warning" className="mb-4" role="alert">
+          Refresh failed — showing the last good report from {report.probed_at}.
+        </CAlert>
+      ) : null}
+      {/* Acceptance R5: the page-level banner — overall status + all reasons.
+          role=status: a polite live region, so screen readers hear a 5 s
+          in-place update (a node going down, a leader change). */}
+      <CAlert color={STATUS_COLOR[report.status]} role="status" className="mb-4">
         <span className="fw-bold">HA {report.status}</span>
         {report.reasons.length > 0 ? <span> — {report.reasons.join(', ')}</span> : null}
       </CAlert>
+      {report.warnings.length > 0 ? (
+        <div className="small text-warning mb-2">{report.warnings.join(' · ')}</div>
+      ) : null}
       <div className="ha-status-grid">
       {report.nodes.map((node) => (
         <ClusterStatusCard key={node.name} node={node} />
@@ -79,41 +93,46 @@ export const ClusterStatusView = () => {
                     holderIdentity / acquireTime / renewTime /
                     leaseDurationSeconds / leaseTransitions. */}
                 <tr>
-                  <td className="text-muted">Holder</td>
+                  <th scope="row" className="text-muted">Holder</th>
                   <td className="fw-bold">{report.leader.replica_id}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Acquire time</td>
+                  <th scope="row" className="text-muted">Acquire time</th>
                   <td>{report.leader.acquired_at ?? '—'}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Renew time</td>
+                  <th scope="row" className="text-muted">Renew time</th>
                   <td>{report.leader.renew_at ?? '—'}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Lease duration</td>
+                  <th scope="row" className="text-muted">Lease duration</th>
                   <td>{report.leader.lease_duration_s} s</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Transitions (fence)</td>
+                  <th scope="row" className="text-muted">Transitions (fence)</th>
                   <td>{report.leader.fence}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Heartbeat age</td>
+                  <th scope="row" className="text-muted">Heartbeat age</th>
                   <td
                     className={
                       report.leader.heartbeat_age_s > HEARTBEAT_STALE_S ? 'text-danger' : undefined
                     }
                   >
                     {report.leader.heartbeat_age_s.toFixed(1)} s
+                    {/* Not color-only: the stale state gets a text marker
+                        too (W048). */}
+                    {report.leader.heartbeat_age_s > HEARTBEAT_STALE_S ? (
+                      <span> (stale)</span>
+                    ) : null}
                   </td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Lock</td>
+                  <th scope="row" className="text-muted">Lock</th>
                   <td>{report.leader.lock_verdict}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">KubeDash replicas</td>
+                  <th scope="row" className="text-muted">KubeDash replicas</th>
                   <td>
                     {report.leader.candidates === null ? (
                       <span className="text-muted">unknown</span>
@@ -143,24 +162,24 @@ export const ClusterStatusView = () => {
             <CTable small className="align-middle mb-0">
               <tbody>
                 <tr>
-                  <td className="text-muted">Pending</td>
+                  <th scope="row" className="text-muted">Pending</th>
                   <td>{report.queue.pending}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Processing</td>
+                  <th scope="row" className="text-muted">Processing</th>
                   <td>{report.queue.processing}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Done</td>
+                  <th scope="row" className="text-muted">Done</th>
                   <td>{report.queue.done}</td>
                 </tr>
                 <tr>
-                  <td className="text-muted">Failed</td>
+                  <th scope="row" className="text-muted">Failed</th>
                   <td>{report.queue.failed}</td>
                 </tr>
                 {report.queue.oldest_pending_at ? (
                   <tr>
-                    <td className="text-muted">Oldest pending</td>
+                    <th scope="row" className="text-muted">Oldest pending</th>
                     <td>{report.queue.oldest_pending_at}</td>
                   </tr>
                 ) : null}

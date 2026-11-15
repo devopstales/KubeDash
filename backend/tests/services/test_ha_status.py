@@ -195,6 +195,17 @@ def test_election_failure_is_never_down() -> None:
     assert der["status"] in ("healthy", "degraded")
 
 
+def test_lock_double_holder_is_degraded() -> None:
+    # Split brain: both reachable nodes claim the leader lock (W049a).
+    nodes = [node("n1", lock=True), node("n2", lock=True)]
+    der = derive_status(nodes, fresh_lease())
+    assert der["election"]["status"] == "degraded"
+    assert "lock_double_holder" in der["election"]["reasons"]
+    verdict = der["leader"]["lock_verdict"]
+    # The verdict names BOTH holders, not just the first.
+    assert "n1" in verdict and "n2" in verdict and "SPLIT BRAIN" in verdict
+
+
 # --- probe seam (fake engine) ---------------------------------------------------
 
 
@@ -204,6 +215,9 @@ class _FakeResult:
 
     def fetchall(self):
         return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
 
 
 class _FakeConn:
@@ -294,6 +308,23 @@ def test_probe_node_unreachable_is_a_result(monkeypatch: pytest.MonkeyPatch) -> 
     assert probe.sub_statuses == ()
 
 
+def test_probe_node_not_joined_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
+    # spock.local_node is empty — the node is reachable (TCP + auth OK) but
+    # has never joined the cluster. A NAMED classification, not
+    # other:ValueError (W049b); the remaining SQL set is skipped because an
+    # unjoined node's tables are not authoritative.
+    conn = _FakeConn({"FROM spock.local_node": []})
+    engine = _FakeEngine(conn)
+    monkeypatch.setattr(ha_status, "create_engine", lambda dsn, **kw: engine)
+
+    probe = probe_node(D1, "replica-1")
+
+    assert probe.reachable is False
+    assert probe.probe_error == "node_not_joined"
+    assert len(conn.executed) == 1  # only the local-node read ran
+    assert engine.disposed is True
+
+
 def test_classify_error() -> None:
     assert classify_error(ConnectionRefusedError()) == "connection_refused"
     assert classify_error(TimeoutError()) == "timeout"
@@ -378,7 +409,9 @@ def test_build_report_merges_overrides_and_assembles(
 
     def _fake_probe(dsn: str, rid: str, timeout_s: float = 3.0, **_kw) -> NodeProbeData:
         seen.append(dsn)
-        return node(dsn.split("@")[1].split(":")[0], lock=True)
+        # One lock holder only (n1) — both holding would be split brain
+        # (lock_double_holder, degraded), which this test does not exercise.
+        return node(dsn.split("@")[1].split(":")[0], lock=dsn == D1)
 
     monkeypatch.setattr(ha_status, "probe_node", _fake_probe)
 
@@ -456,6 +489,28 @@ def test_build_report_member_without_dsn_is_unreachable(
     assert n2["reachable"] is False
     assert n2["probe_error"] == "no_dsn"
     assert "node_unreachable:n2" in report["reasons"]
+
+
+def test_build_report_warns_on_unknown_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A typo'd override name (not in spock.node) is dead config — the
+    # report must say so (W049d). Known names warn nothing.
+    monkeypatch.setattr(ha_status, "_read_catalog", lambda engine: _catalog())
+    monkeypatch.setattr(
+        ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0, **_kw: node("n1")
+    )
+
+    report = build_report(
+        engine=None,
+        dsn_overrides={"n1": D1, "typo": "postgresql://u:p@h:5433/kubedash"},
+    )
+    assert report["warnings"] == [
+        "node_dsn_overrides: unknown node name 'typo' (not in spock.node)"
+    ]
+
+    report = build_report(engine=None, dsn_overrides={"n2": D2})
+    assert report["warnings"] == []
 
 
 def test_build_report_failed_probe_reason_carries_member_name(

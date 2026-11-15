@@ -29,7 +29,7 @@ export const ClusterStatusCard = ({ node }: { node: HaNode }) => (
         <CTable small className="align-middle mb-0">
           <tbody>
             <tr>
-              <td className="text-muted">Replication</td>
+              <th scope="row" className="text-muted">Replication</th>
               <td>
                 {node.sub_statuses.length === 0 ? (
                   <span className="text-muted">no local subscriptions</span>
@@ -47,28 +47,34 @@ export const ClusterStatusCard = ({ node }: { node: HaNode }) => (
               </td>
             </tr>
             <tr>
-              <td className="text-muted">Lag</td>
+              <th scope="row" className="text-muted">Lag</th>
               <td>{formatLag(node)}</td>
             </tr>
             <tr>
-              <td className="text-muted">Apply workers</td>
+              <th scope="row" className="text-muted">Apply workers</th>
               <td>
                 {node.apply_workers}
                 {node.workers_streaming ? <span className="text-success"> (streaming)</span> : null}
               </td>
             </tr>
             <tr>
-              <td className="text-muted">Conflicts</td>
-              <td className={node.conflicts > 0 ? 'text-danger' : undefined}>{node.conflicts}</td>
-            </tr>
-            <tr>
-              <td className="text-muted">Exceptions</td>
-              <td className={node.exceptions_pending > 0 ? 'text-warning' : undefined}>
-                {node.exceptions_pending}
+              <th scope="row" className="text-muted">Conflicts</th>
+              {/* Not color-only: a non-zero conflict count gets a text
+                  marker too (W048). */}
+              <td className={node.conflicts > 0 ? 'text-danger' : undefined}>
+                {node.conflicts}
+                {node.conflicts > 0 ? <span> (non-zero)</span> : null}
               </td>
             </tr>
             <tr>
-              <td className="text-muted">Leader lock</td>
+              <th scope="row" className="text-muted">Exceptions</th>
+              <td className={node.exceptions_pending > 0 ? 'text-warning' : undefined}>
+                {node.exceptions_pending}
+                {node.exceptions_pending > 0 ? <span> (pending)</span> : null}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" className="text-muted">Leader lock</th>
               <td>
                 {node.lock_held_locally ? (
                   <CBadge color="info">

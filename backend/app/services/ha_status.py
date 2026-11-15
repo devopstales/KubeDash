@@ -169,6 +169,10 @@ class ElectionDerivation(SectionDerivation):
 
 def _lock_verdict(nodes: list[NodeProbeData]) -> str:
     holders = [n for n in nodes if n.reachable and n.lock_held_locally]
+    if len(holders) > 1:
+        names = ", ".join(n.node_name for n in holders)
+        pids = ", ".join(str(n.lock_holder_pid) for n in holders)
+        return f"held on {names} (pids {pids}) — SPLIT BRAIN"
     if holders:
         n = holders[0]
         return (
@@ -228,6 +232,11 @@ def derive_election_status(
     """
     reasons: list[str] = []
     lock_line = _lock_verdict(nodes)
+
+    # Split brain: two reachable nodes both holding the leader lock.
+    # Degraded (never down), independent of the heartbeat freshness.
+    if lock_line.endswith("SPLIT BRAIN"):
+        reasons.append("lock_double_holder")
 
     if not lease.present:
         reasons.append("leader_lease_missing")
@@ -372,8 +381,21 @@ def probe_node(
     try:
         engine = _probe_engine(dsn, timeout_s, app_url)
         with engine.connect() as conn:
-            (row,) = conn.execute(text(_LOCAL_NODE_SQL)).fetchall()
-            node_name = row[0]
+            local = conn.execute(text(_LOCAL_NODE_SQL)).fetchone()
+            if local is None:
+                # spock.local_node is empty — the node is reachable (TCP +
+                # auth OK) but has never JOINED the cluster: no identity, no
+                # subscriptions. Named classification, not other:ValueError
+                # (W049b); the remaining SQL set is skipped — the tables of
+                # an unjoined node are not authoritative.
+                node = NodeProbeData(
+                    node_name=node.node_name,
+                    reachable=False,
+                    probe_error="node_not_joined",
+                    elapsed_ms=int((time.monotonic() - t0) * 1000),
+                )
+                return node
+            node_name = local[0]
             sub_statuses: list[tuple[str, str]] = []
             for (sub,) in conn.execute(text(_SUBSCRIPTIONS_SQL)).fetchall():
                 for r in conn.execute(text(_SUB_STATUS_SQL), {"name": sub}).fetchall():
@@ -580,6 +602,12 @@ def build_report(
         return probe
 
     members = catalog["members"]
+    # Overrides naming a node that is not in spock.node (a typo'd name is
+    # silently dead config otherwise — W049d): warn on the report.
+    warnings = [
+        f"node_dsn_overrides: unknown node name '{name}' (not in spock.node)"
+        for name in sorted(set(overrides) - set(members))
+    ]
     # Probes run concurrently (worst case = ONE node's timeout budget, not
     # the sum — the client re-polls every 5 s); member order is preserved.
     with ThreadPoolExecutor(max_workers=max(1, len(members))) as ex:
@@ -637,4 +665,5 @@ def build_report(
         "nodes": nodes,
         "leader": leader,
         "queue": catalog["queue"],
+        "warnings": warnings,
     }

@@ -9,15 +9,16 @@
  * The page-level HA banner (acceptance R5) leads the grid: "HA <status>"
  * + every reason; the node and section cards carry the per-section detail.
  */
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../msw'
 import ClusterStatusView from '../../src/views/ClusterStatus'
+import ClusterStatusCard from '../../src/views/ClusterStatus/ClusterStatusCard'
 import { AdminRoute } from '../../src/routes'
-import type { HaReport } from '../../src/views/ClusterStatus/types'
+import type { HaNode, HaReport } from '../../src/views/ClusterStatus/types'
 
 const NODE_N1 = {
   name: 'n1',
@@ -78,6 +79,7 @@ const HEALTHY: HaReport = {
   reasons: [],
   database: { status: 'healthy', reasons: [] },
   election: { status: 'healthy', reasons: [] },
+  warnings: [],
 }
 
 const DOWN_N2: HaReport = {
@@ -239,5 +241,94 @@ describe('ClusterStatusView', () => {
     renderGate()
     expect(await screen.findByText('Home page')).toBeTruthy()
     expect(screen.queryByText('Leader Election')).toBeNull()
+  })
+
+  test('transient-refetch-failure-keeps-the-last-good-report', async () => {
+    // W049f: a 500 on a LATER poll must not hide the report the page
+    // already showed — the grid stays, a stale-data banner appears.
+    let fail = false
+    server.use(
+      http.get('*/api/v1/admin/ha-status', () =>
+        fail
+          ? HttpResponse.json(
+              { error: { code: 'INTERNAL_ERROR', message: 'boom' } },
+              { status: 500 },
+            )
+          : HttpResponse.json(HEALTHY),
+      ),
+    )
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/settings/cluster-status']}>
+          <Routes>
+            <Route path="/settings/cluster-status" element={<ClusterStatusView />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText(/HA healthy/)).toBeTruthy()
+
+    fail = true
+    await act(async () => {
+      await qc.invalidateQueries()
+    })
+
+    expect(await screen.findByText(/last good report/)).toBeTruthy()
+    // the grid is still rendered, not replaced by the error banner
+    expect(screen.getByText('n1')).toBeTruthy()
+    expect(screen.queryByText(/Cluster status unavailable/)).toBeNull()
+  })
+
+  test('tables-use-row-scoped-headers-and-the-banner-is-a-live-region', async () => {
+    // W048: KV tables carry th scope=row labels; the page banner is a
+    // polite live region so 5 s in-place updates are announced.
+    withHandlers(HEALTHY)
+    const { container } = renderView()
+    expect(await screen.findByText(/HA healthy/)).toBeTruthy()
+    expect(container.querySelectorAll('th[scope="row"]').length).toBeGreaterThanOrEqual(13)
+    expect(screen.getByRole('status')).toBeTruthy()
+  })
+
+  test('stale-heartbeat-gets-a-text-marker-not-color-only', async () => {
+    // W048: NO_LEADER carries heartbeat_age_s 15.2 (> the 10 s stale
+    // threshold) — the stale state must not be color-only.
+    withHandlers(NO_LEADER)
+    renderView()
+    expect(await screen.findByText(/HA degraded/)).toBeTruthy()
+    expect(screen.getByText('15.2 s')).toBeTruthy()
+    expect(screen.getByText('(stale)')).toBeTruthy()
+  })
+
+  test('config-warnings-render-below-the-banner', async () => {
+    // W049d: a typo'd node_dsn_overrides name surfaces as a report
+    // warning the page renders (not silently dropped config).
+    withHandlers({
+      ...HEALTHY,
+      warnings: ["node_dsn_overrides: unknown node name 'typo' (not in spock.node)"],
+    })
+    renderView()
+    expect(await screen.findByText(/HA healthy/)).toBeTruthy()
+    expect(screen.getByText(/unknown node name 'typo'/)).toBeTruthy()
+  })
+})
+
+describe('ClusterStatusCard lag boundary (W049e)', () => {
+  // Every view fixture carries lag_bytes 0 — the KiB/MiB branch was
+  // unobserved. Pin it at the boundary and around it.
+  const withLag = (bytes: number): HaNode => ({
+    ...NODE_N1,
+    lag_bytes: bytes,
+    lag_interval_s: 1.0,
+  })
+
+  test.each([
+    [0, '—'],
+    [512_000, '500.0 KiB'],
+    [1_048_576, '1.0 MiB'], // exactly the KiB->MiB boundary
+    [5_242_880, '5.0 MiB'],
+  ])('lag %i renders %s', (bytes, expected) => {
+    render(<ClusterStatusCard node={withLag(bytes)} />)
+    expect(screen.getByText(new RegExp(expected))).toBeTruthy()
   })
 })

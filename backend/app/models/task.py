@@ -7,11 +7,18 @@ so the partial form is invalid (findings #2); the reaper bounds the
 ``processing`` rows, but ``done`` rows are never pruned — the table grows
 with every completed run (W035: retention is an open ADR-0029 question).
 """
+from sqlalchemy import Index
+
 from app.extensions import db
 
 
 class Task(db.Model):
     __tablename__ = "tasks"
+    # Covers the ha-status queue aggregation (SELECT status, count(*),
+    # min(enqueued_at) FROM tasks GROUP BY status) with an index-only scan:
+    # it is polled every 5 s and the table is never purged (W047; the
+    # retention policy itself is W035's open ADR-0029 question).
+    __table_args__ = (Index("ix_tasks_status_enqueued_at", "status", "enqueued_at"),)
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     # The dotted task path, e.g. ``app.tasks.health.run``.

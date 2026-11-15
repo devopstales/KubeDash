@@ -47,3 +47,23 @@ def test_gunicorn_and_tuning_env_rendered():
     # other four are ADR-0010's (env with no Settings field is dropped).
     assert "KUBEDASH_FIRST_PAINT_BACKSTOP" in out
     assert "KUBEDASH_NAMESPACE_LIST_TIMEOUT" in out
+
+
+def test_deployment_has_replica_count_from_values():
+    # W046: KUBEDASH_REPLICA_COUNT is the source of the ha-status
+    # candidates fallback (leader.candidates when the Deployment read is
+    # unavailable). Drop the env block and this fails — the fallback would
+    # then silently report 1 (the INI default) instead of the deployed
+    # replicaCount.
+    docs = [
+        d
+        for d in yaml.safe_load_all(_template("--set", "replicaCount=3"))
+        if d and d.get("kind") == "Deployment"
+    ]
+    assert docs, "no Deployment rendered"
+    assert docs[0]["spec"]["replicas"] == 3
+    env = {
+        e["name"]: e
+        for e in docs[0]["spec"]["template"]["spec"]["containers"][0]["env"]
+    }
+    assert env["KUBEDASH_REPLICA_COUNT"]["value"] == "3"

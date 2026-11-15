@@ -71,6 +71,15 @@ const ClustersView = () => {
     form.context.trim() !== '' &&
     (isEditing || form.kubeconfig.trim() !== '')
 
+  // The disabled submit must be explainable: name the missing fields
+  // (W048 — a disabled control with no discoverable reason).
+  const missing = [
+    form.name.trim() === '' ? 'Name' : null,
+    form.apiServer.trim() === '' ? 'Kubernetes API URL' : null,
+    form.context.trim() === '' ? 'Kubernetes Config Context' : null,
+    !isEditing && form.kubeconfig.trim() === '' ? 'Kubeconfig' : null,
+  ].filter((f): f is string => f !== null)
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['clusters'] })
 
   const saveMutation = useMutation({
@@ -300,13 +309,23 @@ const ClustersView = () => {
                 }
                 placeholder={'apiVersion: v1\nkind: Config\n...'}
                 required={!isEditing}
+                aria-describedby={isEditing ? 'cluster-kubeconfig-hint' : undefined}
               />
               {isEditing ? (
-                <div className="small text-muted">Leave empty to keep the stored kubeconfig.</div>
+                <div
+                  id="cluster-kubeconfig-hint"
+                  className="small text-muted"
+                >
+                  Leave empty to keep the stored kubeconfig.
+                </div>
               ) : null}
             </div>
           </CModalBody>
           <CModalFooter>
+            {missing.length > 0 ? (
+              // Discoverable reason for the disabled submit (W048).
+              <div className="small text-muted me-auto">Required: {missing.join(', ')}</div>
+            ) : null}
             <CButton color="secondary" type="button" onClick={closeModal}>
               Close
             </CButton>

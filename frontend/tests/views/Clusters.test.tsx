@@ -81,13 +81,20 @@ describe('ClustersView', () => {
     renderClusters()
     expect(await screen.findByText('prod-ctx')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /add cluster/i }))
-    await user.click(screen.getByLabelText(/^name$/i))
+    // Explicit .focus() + paste (not click-then-paste): the click's
+    // focus default-action is load-dependent in jsdom and the paste then
+    // silently lands on no editable element (W042 hardening).
+    const nameField = screen.getByLabelText(/^name$/i)
+    nameField.focus()
     await user.paste('staging')
-    await user.click(screen.getByLabelText(/config context/i))
+    const ctxField = screen.getByLabelText(/config context/i)
+    ctxField.focus()
     await user.paste('staging-ctx')
-    await user.click(screen.getByLabelText(/api url/i))
+    const urlField = screen.getByLabelText(/api url/i)
+    urlField.focus()
     await user.paste('https://staging.example')
-    await user.click(screen.getByLabelText(/kubeconfig/i))
+    const kcField = screen.getByLabelText(/kubeconfig/i)
+    kcField.focus()
     await user.paste(KUBECONFIG)
     const buttons = screen.getAllByRole('button', { name: /^add cluster$/i })
     await user.click(buttons[buttons.length - 1])
@@ -114,7 +121,9 @@ describe('ClustersView', () => {
     await user.click(await screen.findByRole('button', { name: /edit prod/i }))
     const url = screen.getByLabelText(/api url/i)
     await user.clear(url)
-    await user.click(url)
+    // Deterministic focus before paste (W042 hardening — same class as the
+    // add-dialog flow).
+    url.focus()
     await user.paste('https://prod2.example')
     const buttons = screen.getAllByRole('button', { name: /^update cluster$/i })
     await user.click(buttons[buttons.length - 1])
@@ -125,6 +134,34 @@ describe('ClustersView', () => {
         context: 'prod-ctx',
       }),
     )
+  })
+
+  test('edit-modal-kubeconfig-hint-is-associated-with-the-textarea', async () => {
+    // W048: the "keep the stored kubeconfig" hint must be discoverable by
+    // assistive tech (aria-describedby), not just visible text.
+    const user = userEvent.setup()
+    renderClusters()
+    await user.click(await screen.findByRole('button', { name: /edit prod/i }))
+    const kubeconfig = screen.getByLabelText(/kubeconfig/i)
+    expect(kubeconfig).toHaveAttribute('aria-describedby', 'cluster-kubeconfig-hint')
+    expect(screen.getByText('Leave empty to keep the stored kubeconfig.')).toBeTruthy()
+  })
+
+  test('add-dialog-disabled-submit-names-the-missing-fields', async () => {
+    // W048: a disabled submit with no discoverable reason — the footer
+    // names exactly the fields that are missing.
+    const user = userEvent.setup()
+    renderClusters()
+    expect(await screen.findByText('prod-ctx')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /add cluster/i }))
+
+    const buttons = screen.getAllByRole('button', { name: /^add cluster$/i })
+    expect(buttons[buttons.length - 1]).toBeDisabled()
+    expect(
+      screen.getByText(
+        'Required: Name, Kubernetes API URL, Kubernetes Config Context, Kubeconfig',
+      ),
+    ).toBeTruthy()
   })
 
   test('admin deletes a cluster after confirmation', async () => {

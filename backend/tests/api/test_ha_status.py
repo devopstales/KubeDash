@@ -82,3 +82,64 @@ def test_ha_status_non_admin_403(api_client, api_app) -> None:
     r = api_client.get("/api/v1/admin/ha-status", headers=headers)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("abc", 1), ("0", 1), ("-5", 1), ("  7  ", 7), ("3", 3)],
+)
+def test_ha_status_replica_count_fallback_malformed_safe(
+    api_client, api_app, monkeypatch: pytest.MonkeyPatch, raw: str, expected: int
+) -> None:
+    # W049c: the candidates fallback must survive a malformed
+    # kubedash_replica_count (INI/env) — it degrades to 1, never a 500
+    # (the diagnostic page diagnoses; it does not die on its own config).
+    import importlib
+
+    from app.services import ha_status
+
+    admin_module = importlib.import_module("app.api.admin")
+
+    class _S:
+        kubedash_replica_count = raw
+
+    monkeypatch.setattr(admin_module, "get_settings", lambda: _S())
+    captured: dict = {}
+
+    def _fake(*_a, **kw):
+        captured.update(kw)
+        return _report()
+
+    monkeypatch.setattr(ha_status, "build_report", _fake)
+    headers = _seed(api_client, api_app, "local:admin@local", "admin@local", "admin")
+
+    r = api_client.get("/api/v1/admin/ha-status", headers=headers)
+    assert r.status_code == 200
+    assert captured["replica_count"] == expected
+
+
+def test_ha_status_warnings_on_the_wire(
+    api_client, api_app, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # W049d: a typo'd node_dsn_overrides name surfaces as a report warning
+    # on the wire; the schema's dump_default supplies [] when the report
+    # dict lacks the key.
+    from app.services import ha_status
+
+    headers = _seed(api_client, api_app, "local:admin@local", "admin@local", "admin")
+    monkeypatch.setattr(
+        ha_status,
+        "build_report",
+        lambda *a, **kw: {
+            **_report(),
+            "warnings": ["node_dsn_overrides: unknown node name 'typo' (not in spock.node)"],
+        },
+    )
+    body = api_client.get("/api/v1/admin/ha-status", headers=headers).get_json()
+    assert body["warnings"] == [
+        "node_dsn_overrides: unknown node name 'typo' (not in spock.node)"
+    ]
+
+    monkeypatch.setattr(ha_status, "build_report", lambda *a, **kw: _report())
+    body = api_client.get("/api/v1/admin/ha-status", headers=headers).get_json()
+    assert body["warnings"] == []
