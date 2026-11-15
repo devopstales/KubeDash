@@ -94,9 +94,9 @@ changes:
     # Gate Decision). report.md (QA half) + review.md in the archive
     # folder; retro half for reflect.
   2026-10-28-pdb-views:
-    phase: review
-    status: in_progress
-    spec: .skillgrid/change-specs/2026-10-28-pdb-views
+    phase: complete
+    status: complete
+    spec: .skillgrid/change-archive/2026-10-28-pdb-views
     tracker: [TASK-048]
     # Executed 2026-10-29 (TASK-048): 4 commits on `rebase` — backend
     # poddisruptionbudgets kind (policy, namespaced, SAR-gated, 5f1f9244),
@@ -107,7 +107,9 @@ changes:
     # 2026-10-28-other-resource-views). Reviewed 2026-11-13 (7-lens
     # fan-out + red team): PASS with fixes — F1-F5 fixed (hunks absorbed
     # by parallel 40df5929), M2 stale comment fixed at review, F6/F7/M1
-    # parked, F8 dropped (record: review.md). Awaits ship.
+    # parked, F8 dropped (record: review.md). Shipped 2026-11-15
+    # (report.md in the archive; integration floor re-run green: unit
+    # 902, e2e 17/17; branch kept per repo ship rule).
   2026-10-28-vpa-views:
     phase: qa
     status: in_progress
@@ -232,7 +234,7 @@ changes:
     # spec zone on disk with a qa-report.md, recorded at phase qa per its artifacts.
 
 progress:
-  completed_changes: 30
+  completed_changes: 31
   blocked_changes: []
 
 constraints_ref: .skillgrid/projectwiki/ASSUMPTIONS.md
