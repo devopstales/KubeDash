@@ -194,6 +194,21 @@ Parked from the review: **W046–W049** (new) + **W043** (residual updated).
 No-action: Security Info (`leader.token`), Spec scope_creep (test-only commit
 bundling), Standards style FYIs (the dead import-check assertion was removed).
 
+## Window closure (2026-11-15)
+
+All open windows of this change were closed in-gate:
+
+| Window | Closure |
+|--------|---------|
+| W042 | Edit-flow tests hardened: explicit `.focus()` + `user.paste` replaces click-then-paste (jsdom's click focus default-action is load-dependent — the paste silently no-ops on a focused DIV; instrumented, 5/5 stable runs) |
+| W046 | `test_chart.py` now asserts `KUBEDASH_REPLICA_COUNT` tracks `.Values.replicaCount` (delete the env block → test fails) |
+| W047 | Migration `a3f7c91d2b58` adds `ix_tasks_status_enqueued_at` — the 5 s queue aggregation runs as an index-only scan (model + migration; root-cause retention stays W035's open ADR-0029 question) |
+| W048 | ClusterStatus: banner `role=status` live region, `th scope=row` in both KV tables + node cards, `(stale)`/`(non-zero)`/`(pending)` text markers; Clusters modal: `aria-describedby` on the keep-stored hint, `Required: …` footer hint names the missing fields |
+| W049 | All six: (a) `lock_double_holder` + SPLIT BRAIN verdict naming both holders; (b) `node_not_joined` named probe classification; (c) `replica_count` fallback parametrized (abc/0/-5→1, ` 7 `→7, 3→3); (d) `report.warnings` for typo'd overrides — schema `dump_default` + wire test + UI render; (e) `formatLag` boundary pinned (0/500 KiB/1 MiB/5 MiB); (f) transient-500 refetch keeps the last good report + stale-data banner |
+
+Re-verified on the closure tree: **912** backend unit (10 new), **520** vitest
+(12 new), tsc clean. W043 remains the single residual (in-cluster T5).
+
 ## Verification Scope
 
 **COMPLETE** — four levels: unit (902 floor + 43 targeted + derivation matrix

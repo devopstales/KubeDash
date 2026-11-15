@@ -27,6 +27,12 @@ changes:
     # affected files 100% standalone, e2e 20/20, fe-build+fe-check green.
     # Parked: W043 (residual updated) + W046-W049. Record: review.md
     # (disposition table). Next: ship.
+    # Window closure 2026-11-15: W042 (edit-flow focus hardening: explicit
+    # .focus() + paste — jsdom click focus was load-dependent), W046
+    # (chart env assertion), W047 (queue-count index migration
+    # a3f7c91d2b58), W048 (a11y), W049 (edge hardening incl. the warnings
+    # wire field) all closed with tests — 912 unit / 520 vitest green.
+    # W043 remains the single residual (in-cluster T5).
     # Planned 2026-11-10 (briefing + blueprint + findings + acceptance,
     # PROPOSED): admin-only GET /api/v1/admin/ha-status — pgEdge
     # active-active health (both replication directions via per-node
