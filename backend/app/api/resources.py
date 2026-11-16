@@ -131,14 +131,16 @@ _KINDS: dict[str, tuple[str, str, str]] = {
         "verticalpodautoscalers",
         "autoscaling.k8s.io",
     ),
-    # HorizontalPodAutoscaler (autoscaling/v1, namespaced core kind) — the
+    # HorizontalPodAutoscaler (autoscaling/v1, namespaced) — the
     # 4.1-parity nav leaf resolved by TASK-050 (list + data views;
     # ADR-0022 placement). The 4.1 route name was singular; the API kind is
-    # the plural.
+    # the plural. The SAR group is autoscaling (NOT core ""): a core-group
+    # SAR never matches an autoscaling grant (2026-11-16 hpa-views review
+    # fix).
     "horizontalpodautoscalers": (
         "list_horizontal_pod_autoscalers",
         "horizontalpodautoscalers",
-        "",
+        "autoscaling",
     ),
     # LimitRange (core, namespaced) — the 4.1-parity nav leaf resolved by
     # TASK-054 (list + data views; ADR-0022 placement). The 4.1 route name was

@@ -47,7 +47,12 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   // stale-real-view entries below).
   { path: '/network/ingress-class', title: 'IngressClass List' },
   { path: '/security/network-policy', title: 'Network Policies' },
-  { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs' },
+  // HorizontalPodAutoscaler (2026-10-28-hpa-views): real view, kept in this
+  // sweep for the title assertion (same rationale as the stale-real-view
+  // entries above) — the view's docstring cites this e2e assertion. The
+  // title is the view's card title (the sidebar label 'HPAs' cannot satisfy
+  // an exact match, so this pins the route registration).
+  { path: '/other-resource/horizontal-pod-autoscaler', title: 'Horizontal Pod Autoscaler List' },
   // VerticalPodAutoscaler (2026-10-28-vpa-views): real view, kept in this
   // sweep for the title assertion (same rationale as the stale-real-view
   // entries above) — the view's docstring cites this e2e assertion. The

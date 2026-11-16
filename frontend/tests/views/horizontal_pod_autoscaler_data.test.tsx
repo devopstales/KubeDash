@@ -61,7 +61,7 @@ const selectProd = () =>
     selectedNamespace: 'team-a',
   })
 
-// kubernetes to_dict shape: snake_case (a generated core-API model),
+// kubernetes to_dict shape: snake_case (a generated v1 model),
 // spec/status intact.
 const webHpa = {
   apiVersion: 'autoscaling/v1',
@@ -228,6 +228,44 @@ test('data-conditions-from-legacy-annotation', async () => {
   expect(screen.queryByText('No conditions')).toBeNull()
 })
 
+// hpa-data-conditions-legacy-object-field
+test('data-conditions-legacy-object-field', async () => {
+  // The legacy annotation is untrusted cluster metadata: a field holding an
+  // object (e.g. [{"type":{}}]) must render N/A, not throw — React throws
+  // on an object child and there is no error boundary (the SPA would
+  // unmount).
+  const objectCondHpa = {
+    ...webHpa,
+    metadata: {
+      ...webHpa.metadata,
+      annotations: {
+        'autoscaling.alpha.kubernetes.io/conditions': JSON.stringify([
+          { type: {}, status: 'True' },
+        ]),
+      },
+    },
+    status: { current_replicas: 3, desired_replicas: 3, current_cpu_utilization_percentage: 50 },
+  }
+  serveHpa([objectCondHpa])
+  selectProd()
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(<HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />)
+
+  // the full render lands (a React throw would unmount the view and time
+  // out here).
+  await waitFor(() => {
+    expect(container.textContent).toContain('"min_replicas"')
+  })
+  // the conditions row: the object-valued type coerces to N/A, the scalar
+  // status passes through, absent fields render N/A.
+  const trueCell = (await screen.findAllByText('True')).find((el) => el.closest('table'))
+  expect(trueCell).toBeDefined()
+  const condCells = Array.from(
+    trueCell!.closest('tr')!.querySelectorAll('td'),
+  ).map((td) => td.textContent)
+  expect(condCells).toEqual(['N/A', 'True', 'N/A', 'N/A', 'N/A'])
+})
+
 // hpa-data-annotations-trimmed
 test('data-annotations-trimmed', async () => {
   // 4.1's trimAnnotations: the two machine-managed keys are dropped from
@@ -330,4 +368,77 @@ test('data-missing-name', async () => {
 
   expect(await screen.findByText('Error: horizontal pod autoscaler name not provided')).toBeTruthy()
   expect(seen).toHaveLength(0) // no fetch
+})
+
+// hpa-data-conditions-legacy-camelcase-timestamp
+test('data-conditions-legacy-camelcase-timestamp', async () => {
+  // The LIVE 4.1 legacy-annotation shape is camelCase (Go JSON tag
+  // lastTransitionTime) — the Last Transition Time cell must render the
+  // timestamp through the camelCase fallback (the snake_case fixtures only
+  // exercise the to_dict / typed path).
+  const camelCondHpa = {
+    ...webHpa,
+    metadata: {
+      ...webHpa.metadata,
+      annotations: {
+        'autoscaling.alpha.kubernetes.io/conditions': JSON.stringify([
+          {
+            type: 'AbleToScale',
+            status: 'True',
+            lastTransitionTime: '2016-05-08T11:47:46Z',
+            reason: 'SuccessfulRescale',
+            message: 'Ready to scale',
+          },
+        ]),
+      },
+    },
+    status: {
+      current_replicas: 3,
+      desired_replicas: 3,
+      current_cpu_utilization_percentage: 50,
+    },
+  }
+  serveHpa([camelCondHpa])
+  selectProd()
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(
+    <HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />
+  )
+
+  await waitFor(() => {
+    expect(container.textContent).toContain('2016-05-08T11:47:46Z')
+  })
+  // the timestamp renders in the conditions table, not just the JSON
+  // block (which stringifies the annotation and would match too).
+  const inTable = async (text: string) =>
+    (await screen.findAllByText(text)).some((el) => el.closest('table'))
+  expect(await inTable('2016-05-08T11:47:46Z')).toBe(true)
+})
+
+// hpa-data-missing-status
+test('data-missing-status', async () => {
+  // A fresh HPA before the controller reports status: absent spec/status
+  // fields render the pinned literals (— for spec/status) — the HPA analog
+  // of PDB's pdb-data-missing-status pin.
+  const freshHpa = {
+    ...webHpa,
+    status: {},
+  }
+  serveHpa([freshHpa])
+  selectProd()
+  seedActiveRef('web-hpa', 'team-a')
+  const { container } = renderAt(
+    <HorizontalPodAutoscalerDataView name="web-hpa" namespace="team-a" />
+  )
+
+  await waitFor(() => {
+    expect(container.textContent).toContain('"min_replicas"')
+  })
+  const inTable = async (text: string) =>
+    (await screen.findAllByText(text)).some((el) => el.closest('table'))
+  // no current/desired replicas -> the spec/status em-dash literal.
+  expect(await inTable('— Current / — Desired')).toBe(true)
+  // no current CPU utilization -> the 4.1 UNKNOWN literal with the
+  // spec's target.
+  expect(await inTable('UNKNOWN / 80 %')).toBe(true)
 })

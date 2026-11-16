@@ -56,7 +56,7 @@ const selectProd = () =>
     selectedNamespace: 'team-a',
   })
 
-// kubernetes to_dict shape: snake_case (a generated core-API model),
+// kubernetes to_dict shape: snake_case (a generated v1 model),
 // spec/status intact.
 const webHpa = {
   apiVersion: 'autoscaling/v1',
@@ -177,7 +177,7 @@ test('list-targets-and-replica-cells', async () => {
   renderAt(<HorizontalPodAutoscalerView />)
 
   const webLink = await screen.findByRole('button', { name: 'web-hpa' })
-  // The Name cell also carries the ADR-0040 share button (row affordance);
+  // The Name cell is a button (ADR-0040 ObjectRoute ref-driven open);
   // compare the name button's text, not the whole cell.
   const nameTd = cells(webLink.closest('tr'))[0]
   expect(nameTd.textContent).toContain('web-hpa')

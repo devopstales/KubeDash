@@ -274,7 +274,7 @@ class K8sClient:
         self._policy = k8s_client.PolicyV1Api(api_client)
         # HorizontalPodAutoscaler (autoscaling/v1, namespaced) — the R4
         # "horizontalpodautoscalers" kind (4.1-parity nav leaf; ADR-0022
-        # placement). A generated core-API model: ``to_dict`` is snake_case.
+        # placement). A generated v1 model: ``to_dict`` is snake_case.
         self._autoscaling = k8s_client.AutoscalingV1Api(api_client)
         # apps/v1 (Deployment) — the HA status candidates read
         # (pod -> ownerRefs -> ReplicaSet -> deployment.spec.replicas, F14).
@@ -2125,7 +2125,10 @@ class K8sClient:
         Any other ApiException maps to ``ClusterUnreachableError`` (502),
         matching ``get_network_policy``'s transport contract."""
         try:
-            return [self._autoscaling.read_namespaced_horizontal_pod_autoscaler(name, namespace).to_dict()]
+            hpa = self._autoscaling.read_namespaced_horizontal_pod_autoscaler(
+                name, namespace
+            )
+            return [hpa.to_dict()]
         except ApiException as e:
             if e.status == 404:
                 return []

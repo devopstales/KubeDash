@@ -33,15 +33,42 @@ const NOT_FOUND = 'not found'
 // the value); modern HPAs carry them on status.conditions. Read
 // status.conditions first, fall back to the annotation (4.1's source).
 // A malformed/absent annotation renders [] (No conditions), never throws.
+// Fields are coerced to scalar: the legacy annotation is untrusted cluster
+// metadata (a field may hold an object, e.g. [{"type":{}}]), and React
+// throws on an object child — there is no error boundary, so the SPA would
+// unmount. Non-scalars fall through to the row's 'N/A'.
 const LEGACY_CONDITIONS = 'autoscaling.alpha.kubernetes.io/conditions'
-const conditionsOf = (item: HorizontalPodAutoscalerItem | undefined) => {
+
+type NormalizedCondition = {
+  type?: string
+  status?: string
+  reason?: string
+  message?: string
+  last_transition_time?: string
+}
+
+const scalarOf = (v: unknown): string | undefined =>
+  typeof v === 'string' ? v : typeof v === 'number' ? String(v) : undefined
+
+const normalizeCond = (c: unknown): NormalizedCondition => {
+  const o = (typeof c === 'object' && c !== null ? c : {}) as Record<string, unknown>
+  return {
+    type: scalarOf(o.type),
+    status: scalarOf(o.status),
+    reason: scalarOf(o.reason),
+    message: scalarOf(o.message),
+    last_transition_time: scalarOf(o.last_transition_time) ?? scalarOf(o.lastTransitionTime),
+  }
+}
+
+const conditionsOf = (item: HorizontalPodAutoscalerItem | undefined): NormalizedCondition[] => {
   const statusConds = item?.status?.conditions
-  if (statusConds && statusConds.length) return statusConds
+  if (statusConds && statusConds.length) return statusConds.map(normalizeCond)
   const raw = item?.metadata?.annotations?.[LEGACY_CONDITIONS]
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? parsed.map(normalizeCond) : []
   } catch {
     return []
   }
@@ -65,12 +92,15 @@ const trimmedAnnotations = (item: HorizontalPodAutoscalerItem | undefined): [str
  * the truthful `json` highlighter). The read is a SINGLE
  * `?name=&namespace=` fetch (4.1's list-then-filter is dropped; the list
  * view's name links are the sole producer of these query strings). The kind
- * is namespaced (autoscaling/v1, core, snake_case to_dict). The Conditions
+ * is namespaced (autoscaling/v1, snake_case to_dict). The Conditions
  * table reads `status.conditions` first, then the legacy
  * `autoscaling.alpha.kubernetes.io/conditions` annotation (4.1's source —
  * 4.1 read ONLY the annotation, so modern HPAs had an empty table); the
  * dynamic-key table is the typed `Type / Status / Last Transition Time /
- * Reason / Message` shape (ratified deviation). The Metrics row keeps 4.1's
+ * Reason / Message` shape (ratified deviation); legacy-annotation fields
+ * are coerced to scalar (an object-valued field renders `N/A` — the
+ * annotation is untrusted metadata and React throws on object children).
+ * The Metrics row keeps 4.1's
  * legacy v1 CPU target (`UNKNOWN` literal for an absent current). The Owner
  * link (4.1's `/workload/<kind-lower>s`) is dropped — plain text; the full
  * `scale_target_ref` is in the JSON block. `trimAnnotations` IS replicated
@@ -279,25 +309,15 @@ const HorizontalPodAutoscalerDataView = ({
                     </td>
                   </tr>
                 ) : (
-                  conditions.map((c, i) => {
-                    const cond = c as {
-                      type?: string
-                      status?: string
-                      last_transition_time?: string
-                      reason?: string
-                      message?: string
-                      lastTransitionTime?: string
-                    }
-                    return (
-                      <tr key={cond?.type ?? i}>
-                        <td>{cond?.type ?? 'N/A'}</td>
-                        <td>{cond?.status ?? 'N/A'}</td>
-                        <td>{cond?.last_transition_time ?? cond?.lastTransitionTime ?? 'N/A'}</td>
-                        <td>{cond?.reason ?? 'N/A'}</td>
-                        <td>{cond?.message ?? 'N/A'}</td>
-                      </tr>
-                    )
-                  })
+                  conditions.map((c, i) => (
+                    <tr key={c.type ?? i}>
+                      <td>{c.type ?? 'N/A'}</td>
+                      <td>{c.status ?? 'N/A'}</td>
+                      <td>{c.last_transition_time ?? 'N/A'}</td>
+                      <td>{c.reason ?? 'N/A'}</td>
+                      <td>{c.message ?? 'N/A'}</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </CTable>

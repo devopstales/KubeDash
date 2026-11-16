@@ -997,7 +997,8 @@ class FakeK8s:
         return []
 
     def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict]:
-        # Namespaced kind (autoscaling/v1, core): the namespace is forwarded
+        # Namespaced kind (autoscaling/v1, group autoscaling): the namespace
+        # is forwarded
         # (the real K8sClient.list_horizontal_pod_autoscalers pattern). The
         # all-namespaces branch is DISTINCTLY named (team-b) so the API
         # tests can tell the branches apart, mirroring list_network_policies.
@@ -3305,8 +3306,9 @@ def test_list_horizontalpodautoscalers_sar_denied(
     api_client, auth_client, fake_k8s, monkeypatch
 ) -> None:
     """[horizontalpodautoscalers-sar-denied] ADR-0004: the SAR is asked
-    BEFORE the read, on the CORE group ("") with the query namespace — a
-    deny short-circuits to 403 RBAC_DENIED."""
+    BEFORE the read, on the autoscaling group with the query namespace — a
+    deny short-circuits to 403 RBAC_DENIED naming the resource, and the
+    client list call was never made."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
@@ -3316,8 +3318,15 @@ def test_list_horizontalpodautoscalers_sar_denied(
     )
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
-    # the SAR was asked BEFORE the read, core group (a generated v1 kind):
-    assert ("list", "horizontalpodautoscalers", "team-a", None, "") in asked
+    # HorizontalPodAutoscaler is autoscaling (NOT core "") — a core-group
+    # SAR never matches an autoscaling grant (2026-11-16 hpa-views review
+    # fix).
+    assert ("list", "horizontalpodautoscalers", "team-a", None, "autoscaling") in asked
+    # the 403 names the denied resource (acceptance Then-clause).
+    assert "horizontalpodautoscalers" in r.get_json()["error"]["message"]
+    # the client list call was never made — SAR precedes the read (the
+    # acceptance Then-clause; the resourcequota-review pin pattern).
+    assert not getattr(fake_k8s, "hpa_ns_calls", [])
 
 
 def test_horizontalpodautoscalers_binding_404(api_client, auth_client) -> None:

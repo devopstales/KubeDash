@@ -8,7 +8,7 @@
 
 | ADR | How this change follows it |
 |-----|---------------------------|
-| ADR-0004 (RBAC via SAR) | The new kind is SAR-gated like every other resource: `list`/`get` on `horizontalpodautoscalers`, core group (`""`), namespace = the query namespace or `None` (all-namespaces); the SAR is asked BEFORE the client call; 403 names the denied resource. No change to the `can()` mechanism. |
+| ADR-0004 (RBAC via SAR) | The new kind is SAR-gated like every other resource: `list`/`get` on `horizontalpodautoscalers`, autoscaling group (`"autoscaling"`), namespace = the query namespace or `None` (all-namespaces); the SAR is asked BEFORE the client call; 403 names the denied resource. No change to the `can()` mechanism. (2026-11-16 hpa-views review fix: the diffed manifest said core group (`""`) — a core-group SAR never matches an autoscaling grant; same class as the 2026-11-05 storageclasses review fix.) |
 | ADR-0009/0010 (read path) | Reads go through the client pool on request (the `_KINDS` table pattern) — same as secrets/networkpolicies for a namespaced kind; no informer-cache change. |
 | ADR-0020 (air gap) | No new dependency: the kubernetes Python client already ships `AutoscalingV1Api` (the 4.1 code used it; one new attribute `self._autoscaling` in the 5.0 client); the frontend reuses `KubeDataTable`, CoreUI, and the already-vendored `react-syntax-highlighter` (`json` grammar already registered by PriorityClassData/SecretData). |
 | ADR-0022 (other-resources placement) | The view lives under Other Resources — the ratified deviation for 4.1's `other-resources` API grouping. The nav leaf already exists at this path, and 4.1's own template lived in `other-resources/`. |
@@ -78,6 +78,15 @@ pair).
   `kubectl.kubernetes.io/last-applied-configuration` AND
   `autoscaling.alpha.kubernetes.io/conditions` are dropped from the
   annotations table; the JSON block still carries the full object.
+- **The Labels/Annotations Key/Value tables match 4.1's wrapping (added
+  2026-11-04).** The diffed data view used CoreUI `text-break` (word-break)
+  on value cells, which wrapped values mid-token in the auto-sized column;
+  4.1's `{{ value }}` td wraps at whitespace in 50/50 columns, with
+  `.table-responsive` scrolling only when a token outgrows the column.
+  User-requested format fix (commit `61227de3`, the second of two
+  2026-11-04 user format requests — the first was the trim above): the
+  sub-tables render 4.1-style — `CTable` responsive wrapper, 50/50 header
+  widths, no `text-break`.
 
 ## Navigation Superseded (2026-10-29)
 
