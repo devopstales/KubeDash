@@ -1,0 +1,1430 @@
+diff --git a/backend/app/api/resources.py b/backend/app/api/resources.py
+index b81d992a..36c640c6 100644
+--- a/backend/app/api/resources.py
++++ b/backend/app/api/resources.py
+@@ -78,6 +78,15 @@ _KINDS: dict[str, tuple[str, str, str]] = {
+         "verticalpodautoscalers",
+         "autoscaling.k8s.io",
+     ),
++    # HorizontalPodAutoscaler (autoscaling/v1, namespaced core kind) — the
++    # 4.1-parity nav leaf resolved by TASK-050 (list + data views;
++    # ADR-0022 placement). The 4.1 route name was singular; the API kind is
++    # the plural.
++    "horizontalpodautoscalers": (
++        "list_horizontal_pod_autoscalers",
++        "horizontalpodautoscalers",
++        "",
++    ),
+ }
+ 
+ #: kind → K8sClient method for a single-object ``?name=`` lookup
+@@ -91,6 +100,7 @@ _GETTERS: dict[str, str] = {
+     "resourcequotas": "get_resource_quota",
+     "poddisruptionbudgets": "get_pod_disruption_budget",
+     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
++    "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
+ }
+ 
+ 
+diff --git a/backend/app/services/k8s_client.py b/backend/app/services/k8s_client.py
+index 70a200ca..311daa7d 100644
+--- a/backend/app/services/k8s_client.py
++++ b/backend/app/services/k8s_client.py
+@@ -230,6 +230,10 @@ class K8sClient:
+         # PodDisruptionBudget (policy/v1, namespaced) — the R4
+         # "poddisruptionbudgets" kind (4.1-parity nav leaf; ADR-0022 placement).
+         self._policy = k8s_client.PolicyV1Api(api_client)
++        # HorizontalPodAutoscaler (autoscaling/v1, namespaced) — the R4
++        # "horizontalpodautoscalers" kind (4.1-parity nav leaf; ADR-0022
++        # placement). A generated core-API model: ``to_dict`` is snake_case.
++        self._autoscaling = k8s_client.AutoscalingV1Api(api_client)
+         self._host = self._v1.api_client.configuration.host
+ 
+     @staticmethod
+@@ -880,6 +884,36 @@ class K8sClient:
+             self._unreachable("get_network_policy", e)
+             raise AssertionError("unreachable") from e
+ 
++    def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict[str, Any]]:
++        """HorizontalPodAutoscaler list in the standard kubernetes dict form
++        (``to_dict``) for one namespace, or across all namespaces when the
++        namespace is ``None`` (the ``list_secrets`` branch). No field
++        stripping — the view renders ``spec``/``status`` and the data page
++        the full object. A transport ApiException maps to
++        ``ClusterUnreachableError`` (502)."""
++        try:
++            resp = (
++                self._autoscaling.list_namespaced_horizontal_pod_autoscaler(namespace)
++                if namespace
++                else self._autoscaling.list_horizontal_pod_autoscaler_for_all_namespaces()
++            )
++        except ApiException as e:
++            self._unreachable("list_horizontal_pod_autoscalers", e)
++            raise AssertionError("unreachable") from e
++        return [h.to_dict() for h in resp.items]
++
++    def get_horizontal_pod_autoscaler(self, namespace: str, name: str) -> list[dict[str, Any]]:
++        """One HorizontalPodAutoscaler as a 0/1-item list; ``[]`` on 404.
++        Any other ApiException maps to ``ClusterUnreachableError`` (502),
++        matching ``get_network_policy``'s transport contract."""
++        try:
++            return [self._autoscaling.read_namespaced_horizontal_pod_autoscaler(name, namespace).to_dict()]
++        except ApiException as e:
++            if e.status == 404:
++                return []
++            self._unreachable("get_horizontal_pod_autoscaler", e)
++            raise AssertionError("unreachable") from e
++
+     def list_pod_disruption_budgets(self, namespace: str | None) -> list[dict[str, Any]]:
+         """PodDisruptionBudget list in the standard kubernetes dict form
+         (``to_dict``) for one namespace, or across all namespaces when the
+diff --git a/backend/tests/api/test_resources.py b/backend/tests/api/test_resources.py
+index 80d93784..397aa2fe 100644
+--- a/backend/tests/api/test_resources.py
++++ b/backend/tests/api/test_resources.py
+@@ -503,6 +503,58 @@ class FakeK8s:
+             return self.list_vertical_pod_autoscalers(namespace)
+         return []
+ 
++    def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict]:
++        # Namespaced kind (autoscaling/v1, core): the namespace is forwarded
++        # (the real K8sClient.list_horizontal_pod_autoscalers pattern). The
++        # all-namespaces branch is DISTINCTLY named (team-b) so the API
++        # tests can tell the branches apart, mirroring list_network_policies.
++        self.hpa_ns_calls: list[str | None] = []
++        self.hpa_ns_calls.append(namespace)
++        if namespace is None:
++            return [
++                {
++                    "metadata": {"name": "web-hpa", "namespace": "team-b"},
++                    "spec": {"max_replicas": 10, "min_replicas": 2},
++                    "status": {"current_replicas": 3},
++                },
++            ]
++        return [
++            {
++                "metadata": {
++                    "name": "web-hpa",
++                    "namespace": namespace or "team-a",
++                    "creation_timestamp": "2026-01-02T03:04:05Z",
++                    "labels": {"team": "a"},
++                    "annotations": {},
++                },
++                "spec": {
++                    "scale_target_ref": {"kind": "Deployment", "name": "web", "api_version": "apps/v1"},
++                    "min_replicas": 2,
++                    "max_replicas": 10,
++                    "target_cpu_utilization_percentage": 80,
++                },
++                "status": {
++                    "current_replicas": 3,
++                    "desired_replicas": 3,
++                    "current_cpu_utilization_percentage": 50,
++                    "conditions": [
++                        {
++                            "type": "AbleToScale",
++                            "status": "True",
++                            "last_transition_time": "2026-01-02T03:04:06Z",
++                            "reason": "SuccessfulRescale",
++                            "message": "Ready to scale",
++                        }
++                    ],
++                },
++            }
++        ]
++
++    def get_horizontal_pod_autoscaler(self, namespace: str, name: str) -> list[dict]:
++        if name == "web-hpa":
++            return self.list_horizontal_pod_autoscalers(namespace)
++        return []
++
+     def readyz(self) -> bool:
+         return True
+ 
+@@ -1942,6 +1994,121 @@ def test_verticalpodautoscaler_kind_singular_rejected(api_client, auth_client) -
+     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+ 
+ 
++def test_list_horizontalpodautoscalers_200_in_namespace(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[horizontalpodautoscalers-list-200-in-namespace] a bound user listing
++    horizontalpodautoscalers in one namespace gets the to_dict items back,
++    spec (scale_target_ref, min/max replicas) and status (conditions)
++    intact; the namespace is forwarded to the client."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/horizontalpodautoscalers?namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "horizontalpodautoscalers"
++    [item] = body["items"]
++    assert item["metadata"]["name"] == "web-hpa"
++    assert item["metadata"]["namespace"] == "team-a"
++    assert item["spec"]["scale_target_ref"]["name"] == "web"
++    assert item["spec"]["min_replicas"] == 2
++    assert item["spec"]["max_replicas"] == 10
++    assert item["status"]["conditions"][0]["type"] == "AbleToScale"
++    assert fake_k8s.hpa_ns_calls == ["team-a"]
++
++
++def test_list_horizontalpodautoscalers_all_namespaces_without_param(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[horizontalpodautoscalers-list-all-namespaces-without-param] no
++    namespace query hits the all-namespaces branch: the FakeK8s receives
++    None and the distinctly-named team-b item is present."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get("/api/v1/clusters/1/resources/horizontalpodautoscalers", headers=h)
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "horizontalpodautoscalers"
++    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
++    assert fake_k8s.hpa_ns_calls == [None]
++
++
++def test_list_horizontalpodautoscalers_get_by_name(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[horizontalpodautoscalers-get-by-name] ?name= returns a 0/1-item
++    list: a hit returns the one object in team-a, a miss returns []
++    (mirrors get_secret)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/horizontalpodautoscalers?name=web-hpa&namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    [item] = r.get_json()["items"]
++    assert item["metadata"]["name"] == "web-hpa"
++    assert item["metadata"]["namespace"] == "team-a"
++    assert item["spec"]["target_cpu_utilization_percentage"] == 80
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/horizontalpodautoscalers?name=ghost&namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    assert r.get_json()["items"] == []
++
++
++def test_list_horizontalpodautoscalers_sar_denied(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[horizontalpodautoscalers-sar-denied] ADR-0004: the SAR is asked
++    BEFORE the read, on the CORE group ("") with the query namespace — a
++    deny short-circuits to 403 RBAC_DENIED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/horizontalpodautoscalers?namespace=team-a", headers=h
++    )
++    assert r.status_code == 403
++    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
++    # the SAR was asked BEFORE the read, core group (a generated v1 kind):
++    assert ("list", "horizontalpodautoscalers", "team-a", None, "") in asked
++
++
++def test_horizontalpodautoscalers_binding_404(api_client, auth_client) -> None:
++    """[horizontalpodautoscalers-binding-404] an unbound user: the binding
++    gate fails before the SAR, CLUSTER_NOT_FOUND."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    r = api_client.get(
++        "/api/v1/clusters/999/resources/horizontalpodautoscalers?namespace=team-a", headers=h
++    )
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
++
++
++def test_horizontalpodautoscaler_kind_singular_rejected(api_client, auth_client) -> None:
++    """[horizontalpodautoscaler-kind-singular-rejected] the 4.1 route name
++    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    r = api_client.get("/api/v1/clusters/1/resources/horizontalpodautoscaler", headers=h)
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
++
++
+ @pytest.mark.integration
+ def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
+     cid, kubeconfig = kind_client
+diff --git a/backend/tests/services/test_k8s_client_horizontalpodautoscalers.py b/backend/tests/services/test_k8s_client_horizontalpodautoscalers.py
+new file mode 100644
+index 00000000..90519014
+--- /dev/null
++++ b/backend/tests/services/test_k8s_client_horizontalpodautoscalers.py
+@@ -0,0 +1,97 @@
++from types import SimpleNamespace
++
++import pytest
++from kubernetes.client.exceptions import ApiException
++
++from app.core.errors import ClusterUnreachableError
++from app.services.k8s_client import K8sClient
++
++
++def _client(autoscaling: object) -> K8sClient:
++    client = object.__new__(K8sClient)
++    client._autoscaling = autoscaling
++    return client
++
++
++def test_list_horizontal_pod_autoscalers_in_namespace() -> None:
++    """[horizontalpodautoscalers-list-200-in-namespace] a namespace is
++    forwarded to ``list_namespaced_horizontal_pod_autoscaler`` (the
++    ``list_network_policies`` pattern)."""
++    seen: list[object] = []
++    item = SimpleNamespace(
++        to_dict=lambda: {
++            "metadata": {"name": "web-hpa", "namespace": "team-a"},
++            "spec": {
++                "max_replicas": 10,
++                "min_replicas": 2,
++                "scale_target_ref": {"kind": "Deployment", "name": "web"},
++            },
++            "status": {
++                "current_replicas": 3,
++                "current_cpu_utilization_percentage": 50,
++            },
++        }
++    )
++    autoscaling = SimpleNamespace(
++        list_namespaced_horizontal_pod_autoscaler=lambda namespace: (
++            seen.append(namespace),
++            SimpleNamespace(items=[item]),
++        )[1],
++    )
++    result = _client(autoscaling).list_horizontal_pod_autoscalers("team-a")
++    assert result[0]["metadata"]["namespace"] == "team-a"
++    assert seen == ["team-a"]  # the namespace is forwarded, not dropped
++
++
++def test_list_horizontal_pod_autoscalers_all_namespaces_without_namespace() -> None:
++    """[horizontalpodautoscalers-list-all-namespaces-without-param]
++    ``None`` uses the all-namespaces call (the ``list_secrets`` branch)."""
++    seen: list[object] = []
++    autoscaling = SimpleNamespace(
++        list_horizontal_pod_autoscaler_for_all_namespaces=lambda: (
++            seen.append(True),
++            SimpleNamespace(items=[]),
++        )[1],
++    )
++    assert _client(autoscaling).list_horizontal_pod_autoscalers(None) == []
++    assert seen == [True]
++
++
++def test_list_horizontal_pod_autoscalers_maps_500_to_unreachable() -> None:
++    def list_all(namespace: str) -> None:
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(list_namespaced_horizontal_pod_autoscaler=list_all)).list_horizontal_pod_autoscalers(
++            "team-a"
++        )
++
++
++def test_get_horizontal_pod_autoscaler_404_returns_empty_list() -> None:
++    """[horizontalpodautoscalers-get-by-name] a miss is ``[]``, mirroring
++    ``get_network_policy``'s 0/1-item contract."""
++    def read(name: str, namespace: str) -> None:
++        raise ApiException(status=404)
++
++    autoscaling = SimpleNamespace(read_namespaced_horizontal_pod_autoscaler=read)
++    assert _client(autoscaling).get_horizontal_pod_autoscaler("team-a", "ghost") == []
++
++
++def test_get_horizontal_pod_autoscaler_hit_returns_one_item() -> None:
++    item = SimpleNamespace(to_dict=lambda: {"metadata": {"name": "web-hpa"}})
++    autoscaling = SimpleNamespace(
++        read_namespaced_horizontal_pod_autoscaler=lambda name, namespace: item
++    )
++    assert _client(autoscaling).get_horizontal_pod_autoscaler("team-a", "web-hpa") == [
++        {"metadata": {"name": "web-hpa"}}
++    ]
++
++
++def test_get_horizontal_pod_autoscaler_other_api_error_maps_to_unreachable() -> None:
++    def read(name: str, namespace: str) -> None:
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(read_namespaced_horizontal_pod_autoscaler=read)).get_horizontal_pod_autoscaler(
++            "team-a", "web-hpa"
++        )
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 06c739f4..4909982b 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -54,6 +54,12 @@ const PodDisruptionBudgetView = React.lazy(() => import('./views/OtherResource/P
+ const PodDisruptionBudgetDataView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudgetData'))
+ const VerticalPodAutoscalerView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscaler'))
+ const VerticalPodAutoscalerDataView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscalerData'))
++const HorizontalPodAutoscalerView = React.lazy(
++  () => import('./views/OtherResource/HorizontalPodAutoscaler'),
++)
++const HorizontalPodAutoscalerDataView = React.lazy(
++  () => import('./views/OtherResource/HorizontalPodAutoscalerData'),
++)
+ const GroupsView = React.lazy(() => import('./views/Groups'))
+ const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
+ const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
+@@ -451,6 +457,22 @@ const App = () => {
+                         </ProtectedRoute>
+                       }
+                     />
++                    <Route
++                      path="/other-resource/horizontal-pod-autoscaler"
++                      element={
++                        <ProtectedRoute>
++                          <HorizontalPodAutoscalerView />
++                        </ProtectedRoute>
++                      }
++                    />
++                    <Route
++                      path="/other-resource/horizontal-pod-autoscaler/data"
++                      element={
++                        <ProtectedRoute>
++                          <HorizontalPodAutoscalerDataView />
++                        </ProtectedRoute>
++                      }
++                    />
+                     {stubRoutes.map((route) => (
+                       <Route
+                         key={route.path}
+diff --git a/frontend/src/lib/types.ts b/frontend/src/lib/types.ts
+index ef7a28c2..0ab4e82f 100644
+--- a/frontend/src/lib/types.ts
++++ b/frontend/src/lib/types.ts
+@@ -206,6 +206,37 @@ export interface NetworkPolicyItem {
+   [key: string]: unknown
+ }
+ 
++/** A HorizontalPodAutoscaler item as returned by /api/v1/clusters/<id>/resources/horizontalpodautoscalers (kubernetes to_dict, snake_case; namespaced, autoscaling/v1). */
++export interface HorizontalPodAutoscalerItem {
++  metadata?: {
++    name?: string
++    namespace?: string
++    creation_timestamp?: string
++    labels?: Record<string, string>
++    annotations?: Record<string, string>
++  }
++  spec?: {
++    scale_target_ref?: { kind?: string; name?: string; api_version?: string }
++    min_replicas?: number
++    max_replicas?: number
++    target_cpu_utilization_percentage?: number
++    metrics?: unknown[]
++  }
++  status?: {
++    current_replicas?: number
++    desired_replicas?: number
++    current_cpu_utilization_percentage?: number
++    conditions?: Array<{
++      type?: string
++      status?: string
++      last_transition_time?: string
++      reason?: string
++      message?: string
++    }>
++  }
++  [key: string]: unknown
++}
++
+ /** A CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy item (full CRD to_dict). */
+ export interface CiliumPolicyItem {
+   metadata?: {
+diff --git a/frontend/src/views/OtherResource/HorizontalPodAutoscaler.tsx b/frontend/src/views/OtherResource/HorizontalPodAutoscaler.tsx
+new file mode 100644
+index 00000000..cc056746
+--- /dev/null
++++ b/frontend/src/views/OtherResource/HorizontalPodAutoscaler.tsx
+@@ -0,0 +1,135 @@
++import React from 'react'
++import { Link } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { apiFetch } from '../../lib/api'
++import type { HorizontalPodAutoscalerItem, ResourceList } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import KubeDataTable, { Column } from '../../components/KubeDataTable'
++import TopMenu from '../../components/TopMenu'
++
++type HpaRow = {
++  name: string
++  namespace: string
++  owner: string
++  targets: string
++  minReplicas: string
++  maxReplicas: string
++  replicas: string
++}
++
++// 4.1's Targets badge: current/target CPU percent (a legacy autoscaling/v1
++// field). The "UNKNOWN" literal is 4.1's exact fallback for an absent
++// current (certainty rule: never guess). 4.1's list template swapped the
++// Min/Max cells ({{ max_replicas }} under <th>MinReplicas</th>); 5.0
++// renders the matching value under each header.
++const toRow = (item: HorizontalPodAutoscalerItem, namespace: string): HpaRow => ({
++  name: item.metadata?.name ?? '',
++  // the row's OWN namespace: an all-namespaces list would carry mixed
++  // namespaces, and the name link must follow the row, not the store.
++  namespace: item.metadata?.namespace ?? namespace,
++  // 4.1 linked Owner to /workload/<kind-lower>s; 5.0 has no
++  // workload-page destination yet, so it is plain text (the full
++  // scale_target_ref is in the data page's JSON block).
++  owner: item.spec?.scale_target_ref?.name ?? '—',
++  targets: `${item.status?.current_cpu_utilization_percentage ?? 'UNKNOWN'} / ${
++    item.spec?.target_cpu_utilization_percentage ?? '—'
++  } %`,
++  minReplicas: item.spec?.min_replicas != null ? String(item.spec.min_replicas) : '—',
++  maxReplicas: item.spec?.max_replicas != null ? String(item.spec.max_replicas) : '—',
++  replicas: item.status?.current_replicas != null ? String(item.status.current_replicas) : '—',
++})
++
++const nameLink = (row: HpaRow) =>
++  row.name ? (
++    <Link
++      to={`/other-resource/horizontal-pod-autoscaler/data?name=${encodeURIComponent(
++        row.name,
++      )}&namespace=${encodeURIComponent(row.namespace)}`}
++    >
++      {row.name}
++    </Link>
++  ) : null
++
++/**
++ * 4.1 `other-resources/hpa.html.j2` parity: HorizontalPodAutoscalers in the
++ * header-selected namespace (the NetworkPolicy pattern — the namespace comes
++ * from the selected-namespace store, `?? 'default'`; 4.1's
++ * `session['ns_select']` hidden form is the ratified `?name=&namespace=`
++ * delta, briefing.md). A name opens the data page — this list view is the
++ * SOLE producer of those `?name=&namespace=` query strings. The card title
++ * is EXACTLY "Horizontal Pod Autoscaler List": the e2e smoke asserts that
++ * string with exact: true. 4.1 deviations (recorded in the change's
++ * adr.md): the Min/Max header-cell swap is CORRECTED (each header shows its
++ * matching value); Targets is the legacy v1 CPU field with the `UNKNOWN`
++ * literal for an absent current; the Owner link to
++ * `/workload/<kind-lower>s` is dropped (plain text — 5.0 has no workload
++ * page yet). Placement under Other Resources is a ratified deviation
++ * (ADR-0022).
++ */
++const HorizontalPodAutoscalerView = () => {
++  const cluster = useClusterStore((s) => s.selectedCluster)
++  const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
++
++  const query = useQuery<HpaRow[]>({
++    queryKey: ['horizontalpodautoscalers', cluster?.id, namespace],
++    enabled: cluster != null,
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<HorizontalPodAutoscalerItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/horizontalpodautoscalers?namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      return (r.data?.items ?? []).map((item) => toRow(item, namespace))
++    },
++  })
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem active>Horizontal Pod Autoscaler List</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">
++          Horizontal Pod Autoscaler List
++        </CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading horizontal pod autoscalers...</div>
++        ) : query.error ? (
++          <div className="text-danger">
++            Error loading horizontal pod autoscalers: {query.error.message}
++          </div>
++        ) : (query.data ?? []).length === 0 ? (
++          <div className="text-center text-muted">No horizontal pod autoscalers found</div>
++        ) : (
++          <KubeDataTable data={query.data ?? []}>
++            <Column title="Name" data={null}>
++              {nameLink}
++            </Column>
++            <Column title="Namespace" data="namespace" />
++            <Column title="Owner" data="owner" />
++            <Column title="Targets" data="targets" />
++            <Column title="Min Replicas" data="minReplicas" />
++            <Column title="Max Replicas" data="maxReplicas" />
++            <Column title="Replicas" data="replicas" />
++          </KubeDataTable>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default HorizontalPodAutoscalerView
+diff --git a/frontend/src/views/OtherResource/HorizontalPodAutoscalerData.tsx b/frontend/src/views/OtherResource/HorizontalPodAutoscalerData.tsx
+new file mode 100644
+index 00000000..c0b402a4
+--- /dev/null
++++ b/frontend/src/views/OtherResource/HorizontalPodAutoscalerData.tsx
+@@ -0,0 +1,290 @@
++import React from 'react'
++import { Link, useSearchParams } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++  CTable,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
++import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
++import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
++import { apiFetch } from '../../lib/api'
++import { formatTimestamp } from '../../lib/format'
++import type { HorizontalPodAutoscalerItem, ResourceList } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import TopMenu from '../../components/TopMenu'
++
++// Same pattern as SecretData.tsx / NetworkPolicyData.tsx: the hljs language
++// module is a singleton, so a second registration is harmless. Register
++// `json` — the block is `JSON.stringify` of the to_dict object (a YAML
++// subset), so the json grammar is the truthful classifier for the exact text
++// rendered (ratified rule, PriorityClassData final review 2026-10-28).
++SyntaxHighlighter.registerLanguage('json', json)
++
++const NOT_FOUND = 'not found'
++
++// 4.1 read the conditions from the legacy
++// autoscaling.alpha.kubernetes.io/conditions annotation (a json.loads of
++// the value); modern HPAs carry them on status.conditions. Read
++// status.conditions first, fall back to the annotation (4.1's source).
++// A malformed/absent annotation renders [] (No conditions), never throws.
++const LEGACY_CONDITIONS = 'autoscaling.alpha.kubernetes.io/conditions'
++const conditionsOf = (item: HorizontalPodAutoscalerItem | undefined) => {
++  const statusConds = item?.status?.conditions
++  if (statusConds && statusConds.length) return statusConds
++  const raw = item?.metadata?.annotations?.[LEGACY_CONDITIONS]
++  if (!raw) return []
++  try {
++    const parsed = JSON.parse(raw)
++    return Array.isArray(parsed) ? parsed : []
++  } catch {
++    return []
++  }
++}
++
++/**
++ * 4.1 `other-resources/hpa-data.html.j2` port: one HorizontalPodAutoscaler's
++ * metadata plus the 4.1 Conditions table and the full object as a
++ * syntax-highlighted block (`JSON.stringify` — the block is JSON text with
++ * the truthful `json` highlighter). The read is a SINGLE
++ * `?name=&namespace=` fetch (4.1's list-then-filter is dropped; the list
++ * view's name links are the sole producer of these query strings). The kind
++ * is namespaced (autoscaling/v1, core, snake_case to_dict). The Conditions
++ * table reads `status.conditions` first, then the legacy
++ * `autoscaling.alpha.kubernetes.io/conditions` annotation (4.1's source —
++ * 4.1 read ONLY the annotation, so modern HPAs had an empty table); the
++ * dynamic-key table is the typed `Type / Status / Last Transition Time /
++ * Reason / Message` shape (ratified deviation). The Metrics row keeps 4.1's
++ * legacy v1 CPU target (`UNKNOWN` literal for an absent current). The Owner
++ * link (4.1's `/workload/<kind-lower>s`) is dropped — plain text; the full
++ * `scale_target_ref` is in the JSON block. `trimAnnotations` is not
++ * replicated — annotations render verbatim. Empty `items` is a not-found
++ * STATE (pinned copy), not an error. Placement under Other Resources is a
++ * ratified deviation (ADR-0022).
++ */
++const HorizontalPodAutoscalerDataView = () => {
++  const [params] = useSearchParams()
++  const name = params.get('name') ?? ''
++  const namespace = params.get('namespace') ?? ''
++  const cluster = useClusterStore((s) => s.selectedCluster)
++
++  const query = useQuery<HorizontalPodAutoscalerItem>({
++    queryKey: ['hpa-data', cluster?.id, namespace, name],
++    enabled: cluster != null && name !== '' && namespace !== '',
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<HorizontalPodAutoscalerItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/horizontalpodautoscalers?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      const [item] = r.data?.items ?? []
++      if (!item) throw new Error(NOT_FOUND)
++      return item
++    },
++  })
++
++  const item = query.data
++  const labels = Object.entries(item?.metadata?.labels ?? {})
++  const annotations = Object.entries(item?.metadata?.annotations ?? {})
++  const conditions = conditionsOf(item)
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem>
++            <Link to="/other-resource/horizontal-pod-autoscaler">
++              Horizontal Pod Autoscaler List
++            </Link>
++          </CBreadcrumbItem>
++          <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">
++          Horizontal Pod Autoscaler Data
++        </CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!name ? (
++          <div className="text-danger">Error: horizontal pod autoscaler name not provided</div>
++        ) : !cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading horizontal pod autoscaler data...</div>
++        ) : query.error ? (
++          query.error.message === NOT_FOUND ? (
++            // A miss is a state, not an error.
++            <div className="text-center text-muted">
++              No HorizontalPodAutoscaler '{name}' found
++            </div>
++          ) : (
++            <div className="text-danger">
++              Error loading horizontal pod autoscaler: {query.error.message}
++            </div>
++          )
++        ) : (
++          <>
++            <CTable bordered>
++              <tbody>
++                <tr>
++                  <th scope="row">Name:</th>
++                  <td>{item?.metadata?.name ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Created:</th>
++                  <td>{formatTimestamp(item?.metadata?.creation_timestamp)}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Namespace:</th>
++                  <td>{item?.metadata?.namespace ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Owner:</th>
++                  <td>{item?.spec?.scale_target_ref?.name ?? '—'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Metrics:</th>
++                  <td>
++                    {`${item?.status?.current_cpu_utilization_percentage ?? 'UNKNOWN'} / ${
++                      item?.spec?.target_cpu_utilization_percentage ?? '—'
++                    } %`}
++                  </td>
++                </tr>
++                <tr>
++                  <th scope="row">Min Replicas:</th>
++                  <td>{item?.spec?.min_replicas ?? '—'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Max Replicas:</th>
++                  <td>{item?.spec?.max_replicas ?? '—'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Replicas:</th>
++                  <td>
++                    {`${item?.status?.current_replicas ?? '—'} Current / ${
++                      item?.status?.desired_replicas ?? '—'
++                    } Desired`}
++                  </td>
++                </tr>
++                <tr>
++                  <th scope="row">Labels:</th>
++                  <td>
++                    {labels.length === 0 ? (
++                      'No labels'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {labels.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++                <tr>
++                  <th scope="row">Annotations:</th>
++                  <td>
++                    {annotations.length === 0 ? (
++                      'No annotations'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {annotations.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++              </tbody>
++            </CTable>
++            <CTable bordered className="mt-4">
++              <thead>
++                <tr>
++                  <th>Type</th>
++                  <th>Status</th>
++                  <th>Last Transition Time</th>
++                  <th>Reason</th>
++                  <th>Message</th>
++                </tr>
++              </thead>
++              <tbody>
++                {conditions.length === 0 ? (
++                  <tr>
++                    <td colSpan={5} className="text-center text-muted">
++                      No conditions
++                    </td>
++                  </tr>
++                ) : (
++                  conditions.map((c, i) => {
++                    const cond = c as {
++                      type?: string
++                      status?: string
++                      last_transition_time?: string
++                      reason?: string
++                      message?: string
++                      lastTransitionTime?: string
++                    }
++                    return (
++                      <tr key={cond?.type ?? i}>
++                        <td>{cond?.type ?? 'N/A'}</td>
++                        <td>{cond?.status ?? 'N/A'}</td>
++                        <td>{cond?.last_transition_time ?? cond?.lastTransitionTime ?? 'N/A'}</td>
++                        <td>{cond?.reason ?? 'N/A'}</td>
++                        <td>{cond?.message ?? 'N/A'}</td>
++                      </tr>
++                    )
++                  })
++                )}
++              </tbody>
++            </CTable>
++            <CCard className="mb-0 mt-4">
++              <CCardHeader className="py-2">
++                <CCardTitle className="m-0 fw-bold text-primary fs-6">HorizontalPodAutoscaler</CCardTitle>
++              </CCardHeader>
++              <CCardBody>
++                <SyntaxHighlighter
++                  language="json"
++                  style={anOldHope}
++                  wrapLongLines
++                  customStyle={{ margin: 0 }}
++                  codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
++                >
++                  {JSON.stringify(item, null, 2)}
++                </SyntaxHighlighter>
++              </CCardBody>
++            </CCard>
++          </>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default HorizontalPodAutoscalerDataView
+diff --git a/frontend/src/views/Stub/routes.ts b/frontend/src/views/Stub/routes.ts
+index 071adfae..8b9044fc 100644
+--- a/frontend/src/views/Stub/routes.ts
++++ b/frontend/src/views/Stub/routes.ts
+@@ -20,7 +20,6 @@ export const stubRoutes: StubRoute[] = [
+   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot', admin: false },
+   { path: '/storage/storage-class', title: 'StorageClass', admin: false },
+   { path: '/storage/snapshot-class', title: 'SnapshotClass', admin: false },
+-  { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs', admin: false },
+   { path: '/other-resource/limit-range', title: 'Limit Range', admin: false },
+   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
+   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
+diff --git a/frontend/tests/views/Stub.test.tsx b/frontend/tests/views/Stub.test.tsx
+index 7888d36f..3fbc0794 100644
+--- a/frontend/tests/views/Stub.test.tsx
++++ b/frontend/tests/views/Stub.test.tsx
+@@ -65,6 +65,12 @@ function expectedStubs() {
+     // the detail is /other-resource/vertical-pod-autoscaler/data.
+     '/other-resource/vertical-pod-autoscaler',
+     '/other-resource/vertical-pod-autoscaler/data',
++    // Real view (2026-10-28-hpa-views, Task 4) — not a stub route.
++    // The nav leaf targets the list at
++    // /other-resource/horizontal-pod-autoscaler; the detail is
++    // /other-resource/horizontal-pod-autoscaler/data.
++    '/other-resource/horizontal-pod-autoscaler',
++    '/other-resource/horizontal-pod-autoscaler/data',
+   ])
+   const seen = new Map<string, string>()
+   for (const isAdmin of [true, false]) {
+diff --git a/frontend/tests/views/horizontal_pod_autoscaler_data.test.tsx b/frontend/tests/views/horizontal_pod_autoscaler_data.test.tsx
+new file mode 100644
+index 00000000..766636c3
+--- /dev/null
++++ b/frontend/tests/views/horizontal_pod_autoscaler_data.test.tsx
+@@ -0,0 +1,237 @@
++import { render, screen, waitFor } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse, type AnyHandler } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test } from 'vitest'
++import { server } from '../msw'
++import HorizontalPodAutoscalerDataView from '../../src/views/OtherResource/HorizontalPodAutoscalerData'
++import { useClusterStore } from '../../src/store/cluster'
++
++const renderAt = (ui: ReactElement, path: string) => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// kubernetes to_dict shape: snake_case (a generated core-API model),
++// spec/status intact.
++const webHpa = {
++  apiVersion: 'autoscaling/v1',
++  kind: 'HorizontalPodAutoscaler',
++  metadata: {
++    name: 'web-hpa',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-02T03:04:05Z',
++    labels: { team: 'a' },
++    annotations: {},
++  },
++  spec: {
++    scale_target_ref: { kind: 'Deployment', name: 'web', api_version: 'apps/v1' },
++    min_replicas: 2,
++    max_replicas: 10,
++    target_cpu_utilization_percentage: 80,
++  },
++  status: {
++    current_replicas: 3,
++    desired_replicas: 3,
++    current_cpu_utilization_percentage: 50,
++    conditions: [
++      {
++        type: 'AbleToScale',
++        status: 'True',
++        last_transition_time: '2026-01-02T03:04:06Z',
++        reason: 'SuccessfulRescale',
++        message: 'Ready to scale',
++      },
++    ],
++  },
++}
++
++// A legacy HPA with NO status.conditions but the 4.1-era
++// autoscaling.alpha.kubernetes.io/conditions annotation (a JSON list — the
++// live 4.1 shape is camelCase; 5.0's typed table renders the snake_case
++// to_dict form, and this fixture pins that rendering).
++const legacyCondHpa = {
++  ...webHpa,
++  metadata: {
++    ...webHpa.metadata,
++    annotations: {
++      'autoscaling.alpha.kubernetes.io/conditions': JSON.stringify([
++        {
++          type: 'AbleToScale',
++          status: 'True',
++          last_transition_time: '2026-01-02T03:04:06Z',
++          reason: 'SuccessfulRescale',
++          message: 'Ready to scale',
++        },
++      ]),
++    },
++  },
++  status: { current_replicas: 3, desired_replicas: 3, current_cpu_utilization_percentage: 50 },
++}
++
++// Neither status.conditions nor the legacy annotation.
++const noCondHpa = {
++  ...webHpa,
++  metadata: { ...webHpa.metadata, annotations: {} },
++  status: { current_replicas: 3, desired_replicas: 3, current_cpu_utilization_percentage: 50 },
++}
++
++const dataPath = '/other-resource/horizontal-pod-autoscaler/data?name=web-hpa&namespace=team-a'
++
++const serveHpa = (items: unknown[]) =>
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'horizontalpodautoscalers', cluster: 'prod', items }),
++    ),
++  )
++
++// hpa-data-renders-detail
++test('data-renders-detail', async () => {
++  const fetched: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', ({ request }) => {
++      fetched.push(new URL(request.url).href)
++      return HttpResponse.json({ kind: 'horizontalpodautoscalers', cluster: 'prod', items: [webHpa] })
++    }),
++  )
++  selectProd()
++  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
++
++  // Wait for the fetch to land before reading what the view asked for. The
++  // highlighter splits tokens across <code class="hljs-*"> spans, so
++  // findByText cannot match a whole token; poll the DOM text instead.
++  await waitFor(() => {
++    expect(container.textContent).toContain('"min_replicas"')
++  })
++  // single read: EXACTLY one ?name=&namespace= fetch (no 4.1
++  // list-then-filter); the namespace is REQUIRED for the lookup.
++  expect(fetched).toHaveLength(1)
++  const url = new URL(fetched[0])
++  expect(url.searchParams.get('name')).toBe('web-hpa')
++  expect(url.searchParams.get('namespace')).toBe('team-a')
++  // breadcrumb: Other Resources → Horizontal Pod Autoscaler List → name.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  const listLink = screen.getByRole('link', { name: 'Horizontal Pod Autoscaler List' })
++  expect(listLink.getAttribute('href')).toBe('/other-resource/horizontal-pod-autoscaler')
++  // metadata CTable: the item's fields are shown. The same values repeat in
++  // the JSON block below, so scope to a table.
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('team-a')).toBe(true)
++  expect(await inTable('web')).toBe(true) // Owner: scale_target_ref name
++  expect(await inTable('50 / 80 %')).toBe(true) // Metrics
++  expect(await inTable('2')).toBe(true) // Min Replicas
++  expect(await inTable('10')).toBe(true) // Max Replicas
++  expect(await inTable('3 Current / 3 Desired')).toBe(true) // Replicas
++  // labels/annotations sub-tables render: the label key is unique to the
++  // fixture (its VALUE 'a' also appears in the JSON block); annotations
++  // are empty → the pinned empty state.
++  expect(await inTable('team')).toBe(true)
++  expect(screen.getByText('No annotations')).toBeTruthy()
++  // the full object is rendered as a highlighted JSON block.
++  const pre = container.querySelector('pre')
++  expect(pre).not.toBeNull()
++  expect(pre!.textContent).toContain('"min_replicas": 2')
++})
++
++// hpa-data-conditions-from-status
++test('data-conditions-from-status', async () => {
++  serveHpa([webHpa])
++  selectProd()
++  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('AbleToScale')
++  })
++  // The Conditions table is a typed row from status.conditions (4.1 read
++  // ONLY the legacy annotation; modern HPAs carry them on status).
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('AbleToScale')).toBe(true)
++  expect(await inTable('2026-01-02T03:04:06Z')).toBe(true)
++  expect(await inTable('SuccessfulRescale')).toBe(true)
++  expect(await inTable('Ready to scale')).toBe(true)
++  // the Conditions header is present and distinct from the metadata table.
++  const headers = screen.getAllByRole('columnheader').map((th) => th.textContent)
++  expect(headers).toContain('Type')
++  expect(headers).toContain('Status')
++  expect(headers).toContain('Last Transition Time')
++  expect(headers).toContain('Reason')
++  expect(headers).toContain('Message')
++})
++
++// hpa-data-conditions-from-legacy-annotation
++test('data-conditions-from-legacy-annotation', async () => {
++  serveHpa([legacyCondHpa])
++  selectProd()
++  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('AbleToScale')
++  })
++  // 4.1's source: the legacy annotation is the ONLY condition source here —
++  // the typed row must still render from it.
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('AbleToScale')).toBe(true)
++  expect(await inTable('Ready to scale')).toBe(true)
++  expect(screen.queryByText('No conditions')).toBeNull()
++})
++
++// hpa-data-missing-conditions
++test('data-missing-conditions', async () => {
++  serveHpa([noCondHpa])
++  selectProd()
++  const { container } = renderAt(<HorizontalPodAutoscalerDataView />, dataPath)
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('"min_replicas"')
++  })
++  expect(screen.getByText('No conditions')).toBeTruthy()
++})
++
++// hpa-data-not-found-state
++test('data-not-found-state', async () => {
++  serveHpa([])
++  selectProd()
++  const { container } = renderAt(
++    <HorizontalPodAutoscalerDataView />,
++    '/other-resource/horizontal-pod-autoscaler/data?name=ghost&namespace=team-a',
++  )
++
++  // empty items upstream is a state, not an error: pinned copy, no error
++  // styling.
++  expect(await screen.findByText("No HorizontalPodAutoscaler 'ghost' found")).toBeTruthy()
++  expect(container.querySelector('.text-danger')).toBeNull()
++})
++
++// hpa-data-missing-name
++test('data-missing-name', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  selectProd()
++  renderAt(<HorizontalPodAutoscalerDataView />, '/other-resource/horizontal-pod-autoscaler/data')
++
++  expect(await screen.findByText('Error: horizontal pod autoscaler name not provided')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no fetch
++})
+diff --git a/frontend/tests/views/horizontal_pod_autoscalers.test.tsx b/frontend/tests/views/horizontal_pod_autoscalers.test.tsx
+new file mode 100644
+index 00000000..7521e0b0
+--- /dev/null
++++ b/frontend/tests/views/horizontal_pod_autoscalers.test.tsx
+@@ -0,0 +1,265 @@
++import { render, screen } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test, vi } from 'vitest'
++import { server } from '../msw'
++import HorizontalPodAutoscalerView from '../../src/views/OtherResource/HorizontalPodAutoscaler'
++import { useClusterStore } from '../../src/store/cluster'
++
++// Same KubeDataTable fake as network_policies.test.tsx: renders the real row
++// mapping (children-as-render-fns included) so cell assertions test the
++// view's `toRow` output, not DataTables' DOM. The factory is async: a
++// hoisted mock may not touch module-scope consts, so react is imported
++// inline (`vi.mock` calls are hoisted above the imports below).
++vi.mock('../../src/components/KubeDataTable', async () => {
++  const React = (await import('react')) as typeof import('react')
++  const Column = () => null
++  function KubeDataTable({
++    data,
++    children,
++  }: {
++    data: Record<string, unknown>[]
++    children: React.ReactNode
++  }) {
++    const cols = React.Children.toArray(children)
++      .filter(React.isValidElement)
++      .map(
++        (child) =>
++          (
++            child as React.ReactElement<{
++              title: string
++              data: string | null
++              children?: unknown
++            }>
++          ).props,
++      )
++    return (
++      <table>
++        <thead>
++          <tr>
++            {cols.map((col) => (
++              <th key={col.title}>{col.title}</th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {data.map((row, i) => (
++            <tr key={i}>
++              {cols.map((col) => {
++                const value = col.data === null ? row : row[col.data]
++                const node =
++                  typeof col.children === 'function'
++                    ? (col.children as (v: unknown) => React.ReactNode)(value)
++                    : (value as React.ReactNode)
++                return <td key={col.title}>{node ?? ''}</td>
++              })}
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    )
++  }
++  return { default: KubeDataTable, Column }
++})
++
++const renderAt = (ui: ReactElement, path = '/other-resource/horizontal-pod-autoscaler') => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// kubernetes to_dict shape: snake_case (a generated core-API model),
++// spec/status intact.
++const webHpa = {
++  apiVersion: 'autoscaling/v1',
++  kind: 'HorizontalPodAutoscaler',
++  metadata: {
++    name: 'web-hpa',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-02T03:04:05Z',
++    labels: { team: 'a' },
++    annotations: {},
++  },
++  spec: {
++    scale_target_ref: { kind: 'Deployment', name: 'web', api_version: 'apps/v1' },
++    min_replicas: 2,
++    max_replicas: 10,
++    target_cpu_utilization_percentage: 80,
++  },
++  status: {
++    current_replicas: 3,
++    desired_replicas: 3,
++    current_cpu_utilization_percentage: 50,
++    conditions: [
++      {
++        type: 'AbleToScale',
++        status: 'True',
++        last_transition_time: '2026-01-02T03:04:06Z',
++        reason: 'SuccessfulRescale',
++        message: 'Ready to scale',
++      },
++    ],
++  },
++}
++
++// A legacy CPU-only HPA whose controller has not yet reported
++// current_cpu_utilization_percentage (4.1's UNKNOWN literal).
++const noCpuHpa = {
++  ...webHpa,
++  metadata: { ...webHpa.metadata, name: 'no-cpu-hpa' },
++  status: { ...webHpa.status, current_cpu_utilization_percentage: undefined },
++}
++
++const cells = (tr: Element | null) => Array.from(tr?.querySelectorAll('td') ?? [])
++
++// hpa-list-renders-rows-with-data-links
++test('list-renders-hpa-rows-with-data-links', async () => {
++  let requestedPath = ''
++  let requestedNs = ''
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', ({ request }) => {
++      const u = new URL(request.url)
++      requestedPath = u.pathname
++      requestedNs = u.searchParams.get('namespace') ?? ''
++      return HttpResponse.json({
++        kind: 'horizontalpodautoscalers',
++        cluster: 'prod',
++        items: [webHpa],
++      })
++    }),
++  )
++  selectProd()
++  renderAt(<HorizontalPodAutoscalerView />)
++
++  const link = await screen.findByRole('link', { name: 'web-hpa' })
++  // the list view is the sole producer of the data page's query strings.
++  expect(link.getAttribute('href')).toBe(
++    '/other-resource/horizontal-pod-autoscaler/data?name=web-hpa&namespace=team-a',
++  )
++  // the namespaced fetch EXACTLY: cluster path + the header's namespace.
++  expect(requestedPath).toBe('/api/v1/clusters/1/resources/horizontalpodautoscalers')
++  expect(requestedNs).toBe('team-a')
++  // card title: EXACT string (the e2e smoke asserts it with exact: true).
++  expect(screen.getAllByText('Horizontal Pod Autoscaler List', { exact: true }).length).toBeGreaterThanOrEqual(1)
++  // breadcrumb: Other Resources → Horizontal Pod Autoscaler List.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  // columns: the 4.1 list columns.
++  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
++    'Name',
++    'Namespace',
++    'Owner',
++    'Targets',
++    'Min Replicas',
++    'Max Replicas',
++    'Replicas',
++  ])
++  const nameCell = link.closest('tr')
++  // row: the namespace is shown (the namespaced kind).
++  expect(nameCell?.textContent).toContain('team-a')
++})
++
++// hpa-list-targets-and-replica-cells
++test('list-targets-and-replica-cells', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'horizontalpodautoscalers', cluster: 'prod', items: [webHpa] }),
++    ),
++  )
++  selectProd()
++  renderAt(<HorizontalPodAutoscalerView />)
++
++  const webLink = await screen.findByRole('link', { name: 'web-hpa' })
++  expect(cells(webLink.closest('tr')).map((td) => td.textContent)).toEqual([
++    'web-hpa',
++    'team-a',
++    'web', // Owner: scale_target_ref name, PLAIN TEXT (the 4.1 link is dropped)
++    '50 / 80 %', // Targets: current / target CPU percent
++    '2', // Min Replicas: min_replicas — the 4.1 header-swap is CORRECTED (NOT 10)
++    '10', // Max Replicas: max_replicas (NOT 2)
++    '3', // Replicas: status.current_replicas
++  ])
++  // Owner is plain text: no link element inside the Owner cell.
++  const ownerCell = cells(webLink.closest('tr'))[2]
++  expect(ownerCell.querySelector('a')).toBeNull()
++})
++
++// hpa-list-unknown-cpu-target
++test('list-unknown-cpu-target', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'horizontalpodautoscalers', cluster: 'prod', items: [noCpuHpa] }),
++    ),
++  )
++  selectProd()
++  renderAt(<HorizontalPodAutoscalerView />)
++
++  const link = await screen.findByRole('link', { name: 'no-cpu-hpa' })
++  // 4.1's exact fallback for the absent legacy v1 CPU field: the UNKNOWN
++  // literal (certainty rule: never guess).
++  expect(cells(link.closest('tr')).map((td) => td.textContent)).toContain('UNKNOWN / 80 %')
++})
++
++// hpa-list-no-cluster-state
++test('list-no-cluster-state', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++  renderAt(<HorizontalPodAutoscalerView />)
++
++  expect(await screen.findByText('No cluster selected.')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no resource fetch is made
++})
++
++// hpa-list-error-state
++test('list-error-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
++      HttpResponse.json(
++        { error: { code: 'RBAC_DENIED', message: 'list on horizontalpodautoscalers' } },
++        { status: 403 },
++      ),
++    ),
++  )
++  selectProd()
++  renderAt(<HorizontalPodAutoscalerView />)
++
++  expect(
++    await screen.findByText(/Error loading horizontal pod autoscalers: RBAC_DENIED: list on horizontalpodautoscalers/),
++  ).toBeTruthy()
++  // no blank table, no rows.
++  expect(screen.queryAllByRole('link', { name: 'web-hpa' })).toHaveLength(0)
++})
++
++// hpa-list-empty-state
++test('list-empty-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/horizontalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'horizontalpodautoscalers', cluster: 'prod', items: [] }),
++    ),
++  )
++  selectProd()
++  renderAt(<HorizontalPodAutoscalerView />)
++
++  // first-class empty state, not an error.
++  expect(await screen.findByText('No horizontal pod autoscalers found')).toBeTruthy()
++})

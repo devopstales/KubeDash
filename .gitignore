@@ -37,3 +37,6 @@ cli/dist
 .skip_gitleaks
 openwiki/
 report/
+.DS_Store
+.claude/
+graphify-out/

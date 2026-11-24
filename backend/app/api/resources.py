@@ -107,6 +107,11 @@ _KINDS: dict[str, tuple[str, str, str]] = {
     # resolved by TASK-048 (list + data views; ADR-0022 placement). The 4.1
     # route name was singular; the API kind is the plural.
     "poddisruptionbudgets": ("list_pod_disruption_budgets", "poddisruptionbudgets", "policy"),
+    # Deployment (apps/v1, namespaced) — the 4.1-parity nav leaf resolved by
+    # the pods-deployments-views change (list + data views; ADR-0022
+    # placement). The 4.1 route name was singular; the API kind is the
+    # plural.
+    "deployments": ("list_deployments", "deployments", "apps"),
     # GatewayClass (gateway.networking.k8s.io, cluster-scoped CRD) — the
     # ingressclass-gatewayclass-views change (list + data views; ADR-0022
     # placement). Full custom object (the VPA/CRD seam): the CRD's own served
@@ -224,6 +229,10 @@ _GETTERS: dict[str, str] = {
     "storageclasses": "get_storage_class",
     "resourcequotas": "get_resource_quota",
     "poddisruptionbudgets": "get_pod_disruption_budget",
+    # Pods (core, namespaced) — the pods-deployments-views change: the data
+    # page needs the ?name= lookup (the _KINDS row predates it).
+    "pods": "get_pod",
+    "deployments": "get_deployment",
     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
     "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
     "limitranges": "get_limit_range",

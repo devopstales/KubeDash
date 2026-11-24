@@ -33,6 +33,29 @@ const toRow = (item: LimitRangeItem, namespace: string): LimitRangeRow => ({
   created: formatTimestamp(item.metadata?.creation_timestamp),
 })
 
+// ADR-0040: the name cell is a button (not a Link) — openObject writes the
+// ref to sessionStorage and navigates to the clean list route; the URL
+// never carries object identity (R1). The namespace is carried in the ref
+// (the row's OWN namespace — an all-namespaces list would carry mixed
+// namespaces, and the name link must follow the row, not the store), not
+// the URL. The bold is driven by the active ref (R9).
+const nameCell = (row: LimitRangeRow, selected: string | null, navigate: (p: string) => void) =>
+  row.name ? (
+    <>
+      <button
+        type="button"
+        className={
+          'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
+          (row.name === selected ? ' fw-bold' : '')
+        }
+        aria-current={row.name === selected ? 'true' : undefined}
+        onClick={() => openObject(KIND, row.name, row.namespace, LIST_ROUTE, navigate)}
+      >
+        {row.name}
+      </button>
+    </>
+  ) : null
+
 /**
  * 4.1 `other-resources/limit_range.html.j2`: LimitRanges in the
  * header-selected namespace (the Secret/NetworkPolicy pattern for
@@ -68,28 +91,6 @@ const LimitRangeView = () => {
     },
   })
 
-  // ADR-0040: the name cell is a button (not a Link) — openObject writes
-  // the ref to sessionStorage and navigates to the clean list route; the
-  // URL never carries object identity (R1). The namespace is carried in the
-  // ref (the row's OWN namespace), not the URL. The bold is driven by the
-  // active ref (R9).
-  const nameCell = (name: string) =>
-    name ? (
-      <>
-        <button
-          type="button"
-          className={
-            'btn btn-link btn-sm p-0 text-primary text-decoration-underline' +
-            (name === selected ? ' fw-bold' : '')
-          }
-          aria-current={name === selected ? 'true' : undefined}
-          onClick={() => openObject(KIND, name, namespace, LIST_ROUTE, navigate)}
-        >
-          {name}
-        </button>
-      </>
-    ) : null
-
   return (
     <CCard className="shadow mb-4">
       <TopMenu>
@@ -112,8 +113,8 @@ const LimitRangeView = () => {
           <div className="text-center text-muted">No limit ranges found</div>
         ) : (
           <KubeDataTable data={query.data ?? []}>
-            <Column title="Name" data="name">
-              {(name: unknown) => nameCell(name as string)}
+            <Column title="Name" data={null}>
+              {(row: unknown) => nameCell(row as LimitRangeRow, selected, navigate)}
             </Column>
             <Column title="Namespace" data="namespace" />
             <Column title="Created" data="created" />

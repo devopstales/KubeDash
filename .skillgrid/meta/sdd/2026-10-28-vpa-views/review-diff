@@ -1,0 +1,1470 @@
+diff --git a/backend/app/api/resources.py b/backend/app/api/resources.py
+index 62f86a32..b81d992a 100644
+--- a/backend/app/api/resources.py
++++ b/backend/app/api/resources.py
+@@ -69,6 +69,15 @@ _KINDS: dict[str, tuple[str, str, str]] = {
+     # resolved by TASK-048 (list + data views; ADR-0022 placement). The 4.1
+     # route name was singular; the API kind is the plural.
+     "poddisruptionbudgets": ("list_pod_disruption_budgets", "poddisruptionbudgets", "policy"),
++    # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD) — the 4.1-parity
++    # nav leaf resolved by TASK-049 (list + data views; ADR-0022 placement).
++    # Full custom object (the Cilium CRD seam): the CRD's own served version is
++    # the authority, CRD absent -> [] (first-class empty state).
++    "verticalpodautoscalers": (
++        "list_vertical_pod_autoscalers",
++        "verticalpodautoscalers",
++        "autoscaling.k8s.io",
++    ),
+ }
+ 
+ #: kind → K8sClient method for a single-object ``?name=`` lookup
+@@ -81,6 +90,7 @@ _GETTERS: dict[str, str] = {
+     "runtimeclasses": "get_runtime_class",
+     "resourcequotas": "get_resource_quota",
+     "poddisruptionbudgets": "get_pod_disruption_budget",
++    "verticalpodautoscalers": "get_vertical_pod_autoscaler",
+ }
+ 
+ 
+diff --git a/backend/app/services/k8s_client.py b/backend/app/services/k8s_client.py
+index 01aef233..70a200ca 100644
+--- a/backend/app/services/k8s_client.py
++++ b/backend/app/services/k8s_client.py
+@@ -736,6 +736,67 @@ class K8sClient:
+         item = self._crd_body(item)
+         return [item.to_dict() if hasattr(item, "to_dict") else item]
+ 
++    # VerticalPodAutoscaler (autoscaling.k8s.io, namespaced CRD): same
++    # full-custom-object seam as the Cilium kinds — the CRD's own served
++    # version + scope is the authority; the VPA operator is optional, so
++    # CRD absent (None) degrades to [] as a first-class empty state.
++    _VPA_GROUP = "autoscaling.k8s.io"
++    _VPA_PLURAL = "verticalpodautoscalers"
++
++    def list_vertical_pod_autoscalers(self, namespace: str | None) -> list[dict[str, Any]]:
++        """VerticalPodAutoscaler items, FULL custom-object shape (spec + status
++        intact, camelCase — the wire form, like the Cilium CRDs). The VPA CRD's
++        OWN served version + scope is the authority (``get_crd_served``). CRD
++        absent (operator not installed) -> ``[]`` (the expected state, the
++        Cilium absence contract); any other read failure ->
++        ``ClusterUnreachableError`` (502). The VPA pages need
++        ``spec.resourcePolicy.containerPolicies`` and ``status.conditions``,
++        so this returns the raw object — NOT the lossy ``list_crd_instances``
++        projection."""
++        served = self.get_crd_served(self._VPA_GROUP, self._VPA_PLURAL)
++        if served is None:
++            return []
++        version, scope = served
++        custom = self._custom()
++        try:
++            resp = (
++                custom.list_namespaced_custom_object(
++                    self._VPA_GROUP, version, namespace, self._VPA_PLURAL
++                )
++                if namespace and scope == "Namespaced"
++                else custom.list_cluster_custom_object(
++                    self._VPA_GROUP, version, self._VPA_PLURAL
++                )
++            )
++        except ApiException as e:
++            self._unreachable("list_vertical_pod_autoscalers", e)
++            raise AssertionError("unreachable") from e
++        body = self._crd_body(resp)
++        items = body.get("items", [])
++        return [item.to_dict() if hasattr(item, "to_dict") else item for item in items]
++
++    def get_vertical_pod_autoscaler(self, namespace: str, name: str) -> list[dict[str, Any]]:
++        """One VerticalPodAutoscaler as a 0/1-item FULL custom object; ``[]``
++        on 404 or when the CRD is absent (operator not installed). Any other
++        ApiException maps to ``ClusterUnreachableError`` (502), matching
++        ``get_cilium_network_policy``."""
++        served = self.get_crd_served(self._VPA_GROUP, self._VPA_PLURAL)
++        if served is None:
++            return []
++        version, _scope = served
++        custom = self._custom()
++        try:
++            item = custom.get_namespaced_custom_object(
++                self._VPA_GROUP, version, namespace, self._VPA_PLURAL, name
++            )
++        except ApiException as e:
++            if e.status == 404:
++                return []
++            self._unreachable("get_vertical_pod_autoscaler", e)
++            raise AssertionError("unreachable") from e
++        item = self._crd_body(item)
++        return [item.to_dict() if hasattr(item, "to_dict") else item]
++
+     def list_resource_quotas(self, namespace: str | None) -> list[dict[str, Any]]:
+         """ResourceQuota list in the standard kubernetes dict form
+         (``to_dict``) for one namespace, or across all namespaces when the
+diff --git a/backend/tests/api/test_resources.py b/backend/tests/api/test_resources.py
+index c04cb63d..80d93784 100644
+--- a/backend/tests/api/test_resources.py
++++ b/backend/tests/api/test_resources.py
+@@ -444,6 +444,65 @@ class FakeK8s:
+             return self.list_pod_disruption_budgets(namespace)
+         return []
+ 
++    def list_vertical_pod_autoscalers(self, namespace: str | None) -> list[dict]:
++        # Namespaced CRD (autoscaling.k8s.io): the namespace is forwarded;
++        # the FULL custom object (spec + status) is returned (camelCase). The
++        # all-namespaces branch is DISTINCTLY named (team-b) so the API tests
++        # can tell the branches apart, mirroring list_network_policies.
++        self.vpa_ns_calls: list[str | None] = []
++        self.vpa_ns_calls.append(namespace)
++        if namespace is None:
++            return [
++                {
++                    "metadata": {"name": "web-vpa", "namespace": "team-b"},
++                    "spec": {"targetRef": {"kind": "Deployment", "name": "web"}},
++                    "status": {},
++                },
++            ]
++        return [
++            {
++                "metadata": {
++                    "name": "web-vpa",
++                    "namespace": namespace or "team-a",
++                    "creationTimestamp": "2026-01-02T03:04:05Z",
++                    "labels": {"team": "a"},
++                    "annotations": {"vpa.kubernetes.io/managed-by": "kubedash"},
++                },
++                "spec": {
++                    "targetRef": {"kind": "Deployment", "name": "web", "apiVersion": "apps/v1"},
++                    "updatePolicy": {"updateMode": "Auto"},
++                    "resourcePolicy": {
++                        "containerPolicies": [
++                            {
++                                "containerName": "app",
++                                "controlledValues": "RequestsLimits",
++                                "mode": "Auto",
++                                "minAllowed": {"memory": "128Mi"},
++                                "maxAllowed": {"memory": "1Gi"},
++                                "controlledResources": ["cpu", "memory"],
++                            }
++                        ]
++                    },
++                },
++                "status": {
++                    "conditions": [
++                        {
++                            "type": "RecommendationProvided",
++                            "status": "True",
++                            "lastTransitionTime": "2026-01-02T03:04:06Z",
++                            "reason": "RecommendationAvailable",
++                            "message": "recommendation available",
++                        }
++                    ]
++                },
++            }
++        ]
++
++    def get_vertical_pod_autoscaler(self, namespace: str, name: str) -> list[dict]:
++        if name == "web-vpa":
++            return self.list_vertical_pod_autoscalers(namespace)
++        return []
++
+     def readyz(self) -> bool:
+         return True
+ 
+@@ -1770,6 +1829,119 @@ def test_poddisruptionbudget_kind_singular_rejected(api_client, auth_client) ->
+     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+ 
+ 
++def test_list_verticalpodautoscalers_200_in_namespace(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[verticalpodautoscalers-list-200-in-namespace] a bound user listing
++    verticalpodautoscalers?namespace=team-a gets the FULL custom objects
++    back (spec + status intact, camelCase), and the namespace is forwarded
++    to the client (namespaced autoscaling.k8s.io CRD)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a", headers=h
++    )
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "verticalpodautoscalers"
++    assert body["cluster"] == "prod"
++    [item] = body["items"]
++    assert item["metadata"]["name"] == "web-vpa"
++    assert item["metadata"]["namespace"] == "team-a"
++    # full object: spec + status intact (camelCase wire form).
++    assert item["spec"]["targetRef"]["kind"] == "Deployment"
++    assert item["spec"]["updatePolicy"]["updateMode"] == "Auto"
++    assert item["status"]["conditions"][0]["type"] == "RecommendationProvided"
++    # the namespace was forwarded to the client.
++    assert fake_k8s.vpa_ns_calls == ["team-a"]
++
++
++def test_list_verticalpodautoscalers_all_namespaces_without_param(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[verticalpodautoscalers-list-all-namespaces-without-param] no
++    namespace query hits the all-namespaces branch: the FakeK8s receives
++    None and the distinctly-named team-b item is present."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get("/api/v1/clusters/1/resources/verticalpodautoscalers", headers=h)
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "verticalpodautoscalers"
++    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
++    assert fake_k8s.vpa_ns_calls == [None]
++
++
++def test_list_verticalpodautoscalers_get_by_name(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[verticalpodautoscalers-get-by-name] ?name= returns a 0/1-item list:
++    a hit returns the one full object in team-a, a miss returns [] (mirrors
++    get_secret)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/verticalpodautoscalers?name=web-vpa&namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    [item] = r.get_json()["items"]
++    assert item["metadata"]["name"] == "web-vpa"
++    assert item["metadata"]["namespace"] == "team-a"
++    assert item["spec"]["targetRef"]["name"] == "web"
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/verticalpodautoscalers?name=ghost&namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    assert r.get_json()["items"] == []
++
++
++def test_list_verticalpodautoscalers_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
++    """[verticalpodautoscalers-sar-denied] ADR-0004: the SAR is asked BEFORE
++    the read, with the autoscaling.k8s.io group and the query namespace — a
++    deny short-circuits to 403 RBAC_DENIED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a", headers=h
++    )
++    assert r.status_code == 403
++    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
++    assert ("list", "verticalpodautoscalers", "team-a", None, "autoscaling.k8s.io") in asked
++
++
++def test_verticalpodautoscalers_binding_404(api_client, auth_client) -> None:
++    """[verticalpodautoscalers-binding-404] an unbound user: the binding
++    gate fails before the SAR, CLUSTER_NOT_FOUND."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    r = api_client.get(
++        "/api/v1/clusters/999/resources/verticalpodautoscalers?namespace=team-a", headers=h
++    )
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
++
++
++def test_verticalpodautoscaler_kind_singular_rejected(api_client, auth_client) -> None:
++    """[verticalpodautoscaler-kind-singular-rejected] the 4.1 route name
++    (singular) is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    r = api_client.get("/api/v1/clusters/1/resources/verticalpodautoscaler", headers=h)
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
++
++
+ @pytest.mark.integration
+ def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
+     cid, kubeconfig = kind_client
+diff --git a/backend/tests/services/test_k8s_client_verticalpodautoscalers.py b/backend/tests/services/test_k8s_client_verticalpodautoscalers.py
+new file mode 100644
+index 00000000..8f599944
+--- /dev/null
++++ b/backend/tests/services/test_k8s_client_verticalpodautoscalers.py
+@@ -0,0 +1,132 @@
++from types import SimpleNamespace
++
++import pytest
++from kubernetes.client.exceptions import ApiException
++
++from app.core.errors import ClusterUnreachableError
++from app.services.k8s_client import K8sClient
++
++_VERSION = "v1"
++
++
++def _client(custom: object) -> K8sClient:
++    client = object.__new__(K8sClient)
++    client._custom = lambda: custom
++    # The CRD is present and served (the absent case is tested separately).
++    client.get_crd_served = lambda group, plural: (_VERSION, "Namespaced")
++    return client
++
++
++def _vpa(name: str, ns: str) -> dict:
++    return {
++        "apiVersion": "autoscaling.k8s.io/v1",
++        "kind": "VerticalPodAutoscaler",
++        "metadata": {
++            "name": name,
++            "namespace": ns,
++            "creationTimestamp": "2026-01-02T03:04:05Z",
++        },
++        "spec": {
++            "targetRef": {"kind": "Deployment", "name": name, "apiVersion": "apps/v1"},
++            "updatePolicy": {"updateMode": "Auto"},
++            "resourcePolicy": {
++                "containerPolicies": [
++                    {
++                        "containerName": "app",
++                        "minAllowed": {"memory": "128Mi"},
++                        "maxAllowed": {"memory": "1Gi"},
++                        "mode": "Auto",
++                    }
++                ]
++            },
++        },
++        "status": {
++            "conditions": [
++                {
++                    "type": "RecommendationProvided",
++                    "status": "True",
++                    "reason": "RecommendationAvailable",
++                    "message": "ok",
++                    "lastTransitionTime": "2026-01-02T03:04:06Z",
++                }
++            ]
++        },
++    }
++
++
++def test_list_vertical_pod_autoscalers_in_namespace() -> None:
++    """[verticalpodautoscalers-list-200-in-namespace] a namespace is
++    forwarded to ``list_namespaced_custom_object`` and the FULL object
++    (spec + status intact, camelCase) is returned (the Cilium pattern)."""
++    seen: list[object] = []
++    vpa = _vpa("web-vpa", "team-a")
++    custom = SimpleNamespace(
++        list_namespaced_custom_object=lambda group, version, namespace, plural: (
++            seen.append((group, version, namespace, plural)),
++            {"items": [vpa]},
++        )[1],
++    )
++    result = _client(custom).list_vertical_pod_autoscalers("team-a")
++    assert result[0]["metadata"]["name"] == "web-vpa"
++    assert result[0]["spec"]["targetRef"]["kind"] == "Deployment"  # spec intact
++    assert (
++        result[0]["status"]["conditions"][0]["type"] == "RecommendationProvided"
++    )  # status intact
++    assert seen == [("autoscaling.k8s.io", _VERSION, "team-a", "verticalpodautoscalers")]
++
++
++def test_list_vertical_pod_autoscalers_all_namespaces_without_namespace() -> None:
++    """[verticalpodautoscalers-list-all-namespaces-without-param] ``None``
++    uses the all-namespaces custom-object call (the Cilium branch)."""
++    seen: list[object] = []
++    custom = SimpleNamespace(
++        list_cluster_custom_object=lambda group, version, plural: (
++            seen.append(True),
++            {"items": []},
++        )[1],
++    )
++    assert _client(custom).list_vertical_pod_autoscalers(None) == []
++    assert seen == [True]
++
++
++def test_list_vertical_pod_autoscalers_crd_absent_is_empty() -> None:
++    """[verticalpodautoscalers-crd-absent-is-empty] the CRD read is
++    ``None`` (operator not installed) -> ``[]`` (the Cilium absent
++    contract), and the custom-object list is never called."""
++    seen: list[object] = []
++    custom = SimpleNamespace(
++        list_namespaced_custom_object=lambda *a, **k: seen.append(True) or {"items": []}
++    )
++    client = object.__new__(K8sClient)
++    client._custom = lambda: custom
++    client.get_crd_served = lambda group, plural: None
++    assert client.list_vertical_pod_autoscalers("team-a") == []
++    assert seen == []  # the list call was never made
++
++
++def test_get_vertical_pod_autoscaler_404_returns_empty_list() -> None:
++    """[verticalpodautoscalers-get-by-name] a miss is ``[]``, mirroring
++    ``get_cilium_network_policy``'s 0/1-item contract."""
++
++    def get(group, version, namespace, plural, name):
++        raise ApiException(status=404)
++
++    custom = SimpleNamespace(get_namespaced_custom_object=get)
++    assert _client(custom).get_vertical_pod_autoscaler("team-a", "ghost") == []
++
++
++def test_get_vertical_pod_autoscaler_hit_returns_one_full_item() -> None:
++    vpa = _vpa("web-vpa", "team-a")
++    custom = SimpleNamespace(get_namespaced_custom_object=lambda *a, **k: vpa)
++    result = _client(custom).get_vertical_pod_autoscaler("team-a", "web-vpa")
++    assert result[0]["spec"]["targetRef"]["name"] == "web-vpa"  # full object
++
++
++def test_get_vertical_pod_autoscaler_other_api_error_maps_to_unreachable() -> None:
++    def get(group, version, namespace, plural, name):
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(get_namespaced_custom_object=get)).get_vertical_pod_autoscaler(
++            "team-a", "web-vpa"
++        )
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index cf5d38fa..06c739f4 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -52,6 +52,8 @@ const ResourceQuotaView = React.lazy(() => import('./views/OtherResource/Resourc
+ const ResourceQuotaDataView = React.lazy(() => import('./views/OtherResource/ResourceQuotaData'))
+ const PodDisruptionBudgetView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudget'))
+ const PodDisruptionBudgetDataView = React.lazy(() => import('./views/OtherResource/PodDisruptionBudgetData'))
++const VerticalPodAutoscalerView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscaler'))
++const VerticalPodAutoscalerDataView = React.lazy(() => import('./views/OtherResource/VerticalPodAutoscalerData'))
+ const GroupsView = React.lazy(() => import('./views/Groups'))
+ const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
+ const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
+@@ -433,6 +435,22 @@ const App = () => {
+                         </ProtectedRoute>
+                       }
+                     />
++                    <Route
++                      path="/other-resource/vertical-pod-autoscaler"
++                      element={
++                        <ProtectedRoute>
++                          <VerticalPodAutoscalerView />
++                        </ProtectedRoute>
++                      }
++                    />
++                    <Route
++                      path="/other-resource/vertical-pod-autoscaler/data"
++                      element={
++                        <ProtectedRoute>
++                          <VerticalPodAutoscalerDataView />
++                        </ProtectedRoute>
++                      }
++                    />
+                     {stubRoutes.map((route) => (
+                       <Route
+                         key={route.path}
+diff --git a/frontend/src/lib/types.ts b/frontend/src/lib/types.ts
+index 7637d814..ef7a28c2 100644
+--- a/frontend/src/lib/types.ts
++++ b/frontend/src/lib/types.ts
+@@ -312,6 +312,41 @@ export interface PodDisruptionBudgetItem {
+   [key: string]: unknown
+ }
+ 
++/** A VerticalPodAutoscaler custom object as returned by /api/v1/clusters/<id>/resources/verticalpodautoscalers (autoscaling.k8s.io CRD, camelCase wire form; namespaced). */
++export interface VerticalPodAutoscalerItem {
++  metadata?: {
++    name?: string
++    namespace?: string
++    creationTimestamp?: string
++    labels?: Record<string, string>
++    annotations?: Record<string, string>
++  }
++  spec?: {
++    targetRef?: { kind?: string; name?: string; apiVersion?: string }
++    updatePolicy?: { updateMode?: string }
++    resourcePolicy?: {
++      containerPolicies?: Array<{
++        containerName?: string
++        controlledValues?: string
++        mode?: string
++        minAllowed?: Record<string, string>
++        maxAllowed?: Record<string, string>
++        controlledResources?: string[]
++      }>
++    }
++  }
++  status?: {
++    conditions?: Array<{
++      type?: string
++      status?: string
++      lastTransitionTime?: string
++      reason?: string
++      message?: string
++    }>
++  }
++  [key: string]: unknown
++}
++
+ /** Closed set for the detail page's ?kind= param (4.1 parity). */
+ export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
+ export type PolicyKind = (typeof POLICY_KINDS)[number]
+diff --git a/frontend/src/views/OtherResource/VerticalPodAutoscaler.tsx b/frontend/src/views/OtherResource/VerticalPodAutoscaler.tsx
+new file mode 100644
+index 00000000..4cfebdc1
+--- /dev/null
++++ b/frontend/src/views/OtherResource/VerticalPodAutoscaler.tsx
+@@ -0,0 +1,140 @@
++import React from 'react'
++import { Link } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { apiFetch } from '../../lib/api'
++import { formatTimestamp } from '../../lib/format'
++import type { ResourceList, VerticalPodAutoscalerItem } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import KubeDataTable, { Column } from '../../components/KubeDataTable'
++import TopMenu from '../../components/TopMenu'
++
++type VpaRow = {
++  name: string
++  namespace: string
++  targetKind: string
++  targetName: string
++  updateMode: string
++  minMemory: string
++  maxMemory: string
++  created: string
++}
++
++// 4.1's Min/Max Memory take the LAST container in
++// spec.resourcePolicy.containerPolicies that defines the key (the Jinja
++// `{% set mem_min = ... %}` overwrite). "N/A" is 4.1's literal for the
++// absent value (certainty rule: never guess, never crash the row).
++const containerMem = (item: VerticalPodAutoscalerItem, key: 'minAllowed' | 'maxAllowed'): string => {
++  let value = 'N/A'
++  for (const cp of item.spec?.resourcePolicy?.containerPolicies ?? []) {
++    const v = cp?.[key]?.memory
++    if (v != null) value = String(v)
++  }
++  return value
++}
++
++const toRow = (item: VerticalPodAutoscalerItem, namespace: string): VpaRow => ({
++  name: item.metadata?.name ?? '',
++  namespace: item.metadata?.namespace ?? namespace,
++  targetKind: item.spec?.targetRef?.kind ?? 'N/A',
++  // 4.1 linked Target Name to /workload/<kind-lower>s; 5.0 has no
++  // workload-page destination yet, so it is plain text (the full
++  // targetRef is in the data page's JSON block).
++  targetName: item.spec?.targetRef?.name ?? 'N/A',
++  updateMode: item.spec?.updatePolicy?.updateMode ?? 'N/A',
++  minMemory: containerMem(item, 'minAllowed'),
++  maxMemory: containerMem(item, 'maxAllowed'),
++  created: formatTimestamp(item.metadata?.creationTimestamp),
++})
++
++const nameLink = (row: VpaRow) =>
++  row.name ? (
++    <Link
++      to={`/other-resource/vertical-pod-autoscaler/data?name=${encodeURIComponent(row.name)}&namespace=${encodeURIComponent(
++        row.namespace,
++      )}`}
++    >
++      {row.name}
++    </Link>
++  ) : null
++
++/**
++ * 4.1 `other-resources/vpa.html.j2` port: VerticalPodAutoscalers in the
++ * header-selected namespace. The kind is a NAMESPACED CRD
++ * (verticalpodautoscalers.autoscaling.k8s.io) read as a FULL custom object
++ * (spec + status intact, camelCase — the Cilium precedent; the CRD's own
++ * served version is the authority, CRD-absent degrades to the empty state
++ * below). A name opens the data page with `?name=&namespace=` query params
++ * (the 4.1 hidden-form POST is dropped); this view is the sole producer of
++ * those query strings (the row's OWN namespace — an all-namespaces list
++ * would carry mixed namespaces). The card title is EXACTLY "Vertical Pod
++ * Autoscaler List": the e2e smoke asserts that string with exact: true.
++ * Placement under Other Resources is a ratified deviation (ADR-0022).
++ */
++const VerticalPodAutoscalerView = () => {
++  const cluster = useClusterStore((s) => s.selectedCluster)
++  const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
++
++  const query = useQuery<VpaRow[]>({
++    queryKey: ['verticalpodautoscalers', cluster?.id, namespace],
++    enabled: cluster != null,
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<VerticalPodAutoscalerItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/verticalpodautoscalers?namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      return (r.data?.items ?? []).map((item) => toRow(item, namespace))
++    },
++  })
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem active>Vertical Pod Autoscaler List</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">Vertical Pod Autoscaler List</CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading vertical pod autoscalers...</div>
++        ) : query.error ? (
++          <div className="text-danger">
++            Error loading vertical pod autoscalers: {query.error.message}
++          </div>
++        ) : (query.data ?? []).length === 0 ? (
++          // Also the CRD-absent state (operator not installed): the API
++          // returns [] in both cases and the page does not distinguish.
++          <div className="text-center text-muted">No vertical pod autoscalers found</div>
++        ) : (
++          <KubeDataTable data={query.data ?? []}>
++            <Column title="Name" data={null}>
++              {(row: VpaRow) => nameLink(row)}
++            </Column>
++            <Column title="Namespace" data="namespace" />
++            <Column title="Target Kind" data="targetKind" />
++            <Column title="Target Name" data="targetName" />
++            <Column title="Update Mode" data="updateMode" />
++            <Column title="Min Memory" data="minMemory" />
++            <Column title="Max Memory" data="maxMemory" />
++            <Column title="Created" data="created" />
++          </KubeDataTable>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default VerticalPodAutoscalerView
+diff --git a/frontend/src/views/OtherResource/VerticalPodAutoscalerData.tsx b/frontend/src/views/OtherResource/VerticalPodAutoscalerData.tsx
+new file mode 100644
+index 00000000..5b6c4b50
+--- /dev/null
++++ b/frontend/src/views/OtherResource/VerticalPodAutoscalerData.tsx
+@@ -0,0 +1,275 @@
++import React from 'react'
++import { Link, useSearchParams } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++  CTable,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
++import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
++import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
++import { apiFetch } from '../../lib/api'
++import { formatTimestamp } from '../../lib/format'
++import type { ResourceList, VerticalPodAutoscalerItem } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import TopMenu from '../../components/TopMenu'
++
++// Same pattern as PriorityClassData.tsx / NetworkPolicyData.tsx: the hljs
++// language module is a singleton, so a second registration is harmless.
++// Register `json` — the block is `JSON.stringify` of the custom object
++// (a YAML subset), so the json grammar is the truthful classifier for the
++// exact text rendered (ratified rule, PriorityClassData final review
++// 2026-10-28).
++SyntaxHighlighter.registerLanguage('json', json)
++
++const NOT_FOUND = 'not found'
++
++// Min/Max Allowed render "resource: value" lines (N/A when the bound is
++// absent — certainty rule: never guess).
++const bounds = (b?: Record<string, string>) =>
++  b && Object.keys(b).length ? Object.entries(b).map(([k, v]) => `${k}: ${v}`) : ['N/A']
++
++/**
++ * 4.1 `other-resources/vpa-data.html.j2` port: one VerticalPodAutoscaler's
++ * metadata plus the 4.1 Container Policies + Conditions tables, and the
++ * full object as a syntax-highlighted block (`JSON.stringify` — the block
++ * is JSON text with the truthful `json` highlighter). The read is a SINGLE
++ * `?name=&namespace=` fetch (4.1's list-then-filter is dropped; the list
++ * view's name links are the sole producer of these query strings). The
++ * kind is a namespaced CRD (autoscaling.k8s.io, full custom object,
++ * camelCase — the Cilium seam). The Conditions table reads
++ * `status.conditions` — 4.1 iterated a top-level `conditions` key its read
++ * function never populated (a dead table); the real conditions live under
++ * `status`. The Target (Owner) link (4.1's `/workload/<kind-lower>s`) is
++ * dropped: 5.0 has no workload-page destination yet (plain text; the full
++ * targetRef is in the JSON block). `trimAnnotations` is not replicated —
++ * annotations render verbatim. Empty `items` is a not-found STATE (pinned
++ * copy), not an error — also the CRD-absent state (the backend returns []
++ * in both cases). Placement under Other Resources is a ratified deviation
++ * (ADR-0022).
++ */
++const VerticalPodAutoscalerDataView = () => {
++  const [params] = useSearchParams()
++  const name = params.get('name') ?? ''
++  const namespace = params.get('namespace') ?? ''
++  const cluster = useClusterStore((s) => s.selectedCluster)
++
++  const query = useQuery<VerticalPodAutoscalerItem>({
++    queryKey: ['vpa-data', cluster?.id, namespace, name],
++    enabled: cluster != null && name !== '' && namespace !== '',
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<VerticalPodAutoscalerItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/verticalpodautoscalers?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      const [item] = r.data?.items ?? []
++      if (!item) throw new Error(NOT_FOUND)
++      return item
++    },
++  })
++
++  const item = query.data
++  const labels = Object.entries(item?.metadata?.labels ?? {})
++  const annotations = Object.entries(item?.metadata?.annotations ?? {})
++  const policies = item?.spec?.resourcePolicy?.containerPolicies ?? []
++  const conditions = item?.status?.conditions ?? []
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem>
++            <Link to="/other-resource/vertical-pod-autoscaler">Vertical Pod Autoscaler List</Link>
++          </CBreadcrumbItem>
++          <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">Vertical Pod Autoscaler Data</CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!name ? (
++          <div className="text-danger">Error: vertical pod autoscaler name not provided</div>
++        ) : !cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading vertical pod autoscaler data...</div>
++        ) : query.error ? (
++          query.error.message === NOT_FOUND ? (
++            // A miss (or the CRD-absent state) is a state, not an error.
++            <div className="text-center text-muted">
++              No VerticalPodAutoscaler '{name}' found
++            </div>
++          ) : (
++            <div className="text-danger">
++              Error loading vertical pod autoscaler: {query.error.message}
++            </div>
++          )
++        ) : (
++          <>
++            <CTable bordered>
++              <tbody>
++                <tr>
++                  <th scope="row">Name:</th>
++                  <td>{item?.metadata?.name ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Created:</th>
++                  <td>{formatTimestamp(item?.metadata?.creationTimestamp)}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Namespace:</th>
++                  <td>{item?.metadata?.namespace ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Target (Owner):</th>
++                  <td>{item?.spec?.targetRef?.name ?? '—'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Update Mode:</th>
++                  <td>{item?.spec?.updatePolicy?.updateMode ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Labels:</th>
++                  <td>
++                    {labels.length === 0 ? (
++                      'No labels'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {labels.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++                <tr>
++                  <th scope="row">Annotations:</th>
++                  <td>
++                    {annotations.length === 0 ? (
++                      'No annotations'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {annotations.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++              </tbody>
++            </CTable>
++            <CTable bordered className="mt-4">
++              <thead>
++                <tr>
++                  <th>Container Name</th>
++                  <th>Controlled Values</th>
++                  <th>Mode</th>
++                  <th>Min Allowed</th>
++                  <th>Max Allowed</th>
++                  <th>Controlled Resources</th>
++                </tr>
++              </thead>
++              <tbody>
++                {policies.length === 0 ? (
++                  <tr>
++                    <td colSpan={6} className="text-center text-muted">
++                      No container policies
++                    </td>
++                  </tr>
++                ) : (
++                  policies.map((cp, i) => (
++                    <tr key={cp?.containerName ?? i}>
++                      <td>{cp?.containerName ?? 'N/A'}</td>
++                      <td>{cp?.controlledValues ?? 'N/A'}</td>
++                      <td>{cp?.mode ?? 'N/A'}</td>
++                      <td>{bounds(cp?.minAllowed).join('<br/>')}</td>
++                      <td>{bounds(cp?.maxAllowed).join('<br/>')}</td>
++                      <td>{cp?.controlledResources?.join(', ') || 'N/A'}</td>
++                    </tr>
++                  ))
++                )}
++              </tbody>
++            </CTable>
++            <CTable bordered className="mt-4">
++              <thead>
++                <tr>
++                  <th>Type</th>
++                  <th>Status</th>
++                  <th>Last Transition Time</th>
++                  <th>Reason</th>
++                  <th>Message</th>
++                </tr>
++              </thead>
++              <tbody>
++                {conditions.length === 0 ? (
++                  <tr>
++                    <td colSpan={5} className="text-center text-muted">
++                      No conditions
++                    </td>
++                  </tr>
++                ) : (
++                  conditions.map((c, i) => (
++                    <tr key={c?.type ?? i}>
++                      <td>{c?.type ?? 'N/A'}</td>
++                      <td>{c?.status ?? 'N/A'}</td>
++                      <td>{c?.lastTransitionTime ?? 'N/A'}</td>
++                      <td>{c?.reason ?? 'N/A'}</td>
++                      <td>{c?.message ?? 'N/A'}</td>
++                    </tr>
++                  ))
++                )}
++              </tbody>
++            </CTable>
++            <CCard className="mb-0 mt-4">
++              <CCardHeader className="py-2">
++                <CCardTitle className="m-0 fw-bold text-primary fs-6">VerticalPodAutoscaler</CCardTitle>
++              </CCardHeader>
++              <CCardBody>
++                <SyntaxHighlighter
++                  language="json"
++                  style={anOldHope}
++                  wrapLongLines
++                  customStyle={{ margin: 0 }}
++                  codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
++                >
++                  {JSON.stringify(item, null, 2)}
++                </SyntaxHighlighter>
++              </CCardBody>
++            </CCard>
++          </>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default VerticalPodAutoscalerDataView
+diff --git a/frontend/src/views/Stub/routes.ts b/frontend/src/views/Stub/routes.ts
+index 1ff1cf52..071adfae 100644
+--- a/frontend/src/views/Stub/routes.ts
++++ b/frontend/src/views/Stub/routes.ts
+@@ -21,7 +21,6 @@ export const stubRoutes: StubRoute[] = [
+   { path: '/storage/storage-class', title: 'StorageClass', admin: false },
+   { path: '/storage/snapshot-class', title: 'SnapshotClass', admin: false },
+   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs', admin: false },
+-  { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs', admin: false },
+   { path: '/other-resource/limit-range', title: 'Limit Range', admin: false },
+   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
+   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
+diff --git a/frontend/tests/views/Stub.test.tsx b/frontend/tests/views/Stub.test.tsx
+index eed97964..7888d36f 100644
+--- a/frontend/tests/views/Stub.test.tsx
++++ b/frontend/tests/views/Stub.test.tsx
+@@ -60,6 +60,11 @@ function expectedStubs() {
+     // the detail is /other-resource/pod-disruption-budget/data.
+     '/other-resource/pod-disruption-budget',
+     '/other-resource/pod-disruption-budget/data',
++    // Real view (2026-10-28-vpa-views, Task 4) — not a stub route.
++    // The nav leaf targets the list at /other-resource/vertical-pod-autoscaler;
++    // the detail is /other-resource/vertical-pod-autoscaler/data.
++    '/other-resource/vertical-pod-autoscaler',
++    '/other-resource/vertical-pod-autoscaler/data',
+   ])
+   const seen = new Map<string, string>()
+   for (const isAdmin of [true, false]) {
+diff --git a/frontend/tests/views/vertical_pod_autoscaler_data.test.tsx b/frontend/tests/views/vertical_pod_autoscaler_data.test.tsx
+new file mode 100644
+index 00000000..7a4cef95
+--- /dev/null
++++ b/frontend/tests/views/vertical_pod_autoscaler_data.test.tsx
+@@ -0,0 +1,219 @@
++import { render, screen, waitFor } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse, type AnyHandler } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test } from 'vitest'
++import { server } from '../msw'
++import VerticalPodAutoscalerDataView from '../../src/views/OtherResource/VerticalPodAutoscalerData'
++import { useClusterStore } from '../../src/store/cluster'
++
++const renderAt = (ui: ReactElement, path: string) => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// The VPA CRD's full custom object: camelCase (the custom-object wire form).
++const webVpa = {
++  apiVersion: 'autoscaling.k8s.io/v1',
++  kind: 'VerticalPodAutoscaler',
++  metadata: {
++    name: 'web-vpa',
++    namespace: 'team-a',
++    creationTimestamp: '2026-01-02T03:04:05Z',
++    labels: { team: 'a' },
++    annotations: { 'vpa.kubernetes.io/managed-by': 'kubedash' },
++  },
++  spec: {
++    targetRef: { kind: 'Deployment', name: 'web', apiVersion: 'apps/v1' },
++    updatePolicy: { updateMode: 'Auto' },
++    resourcePolicy: {
++      containerPolicies: [
++        {
++          containerName: 'app',
++          controlledValues: 'RequestsLimits',
++          mode: 'Auto',
++          minAllowed: { memory: '128Mi' },
++          maxAllowed: { memory: '1Gi' },
++          controlledResources: ['cpu', 'memory'],
++        },
++      ],
++    },
++  },
++  status: {
++    conditions: [
++      {
++        type: 'RecommendationProvided',
++        status: 'True',
++        lastTransitionTime: '2026-01-02T03:04:06Z',
++        reason: 'RecommendationAvailable',
++        message: 'ok',
++      },
++    ],
++  },
++}
++
++const dataPath = '/other-resource/vertical-pod-autoscaler/data?name=web-vpa&namespace=team-a'
++
++test('vpa-data-renders-detail', async () => {
++  let searchParams = new URLSearchParams()
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', ({ request }) => {
++      searchParams = new URL(request.url).searchParams
++      return HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [webVpa] })
++    }),
++  )
++  selectProd()
++  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
++
++  // Wait for the fetch to land before reading what the view asked for. The
++  // highlighter splits tokens across <code class="hljs-*"> spans, so
++  // findByText cannot match a whole token; poll the DOM text instead.
++  await waitFor(() => {
++    expect(container.textContent).toContain('"updateMode"')
++  })
++  // single read: EXACTLY one ?name=&namespace= fetch (no 4.1
++  // list-then-filter). The namespace is REQUIRED for the lookup.
++  expect(searchParams.get('name')).toBe('web-vpa')
++  expect(searchParams.get('namespace')).toBe('team-a')
++  // breadcrumb: Other Resources → Vertical Pod Autoscaler List → name.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  const listLink = screen.getByRole('link', { name: 'Vertical Pod Autoscaler List' })
++  expect(listLink.getAttribute('href')).toBe('/other-resource/vertical-pod-autoscaler')
++  // metadata CTable: the item's spec fields and metadata are shown. The same
++  // values repeat in the JSON block below, so scope to a table.
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('team-a')).toBe(true)
++  expect(await inTable('Auto')).toBe(true)
++  // labels/annotations render (keys are unique to the fixture).
++  expect(await inTable('team')).toBe(true)
++  expect(await inTable('vpa.kubernetes.io/managed-by')).toBe(true)
++  // Container Policies table: header + the fixture's policy row.
++  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Controlled Values')
++  expect(await inTable('app')).toBe(true)
++  expect(await inTable('RequestsLimits')).toBe(true)
++  expect(await inTable('memory: 128Mi')).toBe(true)
++  expect(await inTable('memory: 1Gi')).toBe(true)
++  expect(await inTable('cpu, memory')).toBe(true)
++  // the full object is rendered as a highlighted JSON block.
++  const pre = container.querySelector('pre')
++  expect(pre).not.toBeNull()
++  expect(pre!.textContent).toContain('"updateMode": "Auto"')
++})
++
++test('vpa-data-conditions-from-status', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [webVpa] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('RecommendationProvided')
++  })
++  // The Conditions row is sourced from status.conditions — 4.1's top-level
++  // `conditions` key was never populated by its read function (a dead
++  // table); assert the typed row renders.
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('RecommendationProvided')).toBe(true)
++  expect(await inTable('RecommendationAvailable')).toBe(true)
++  expect(await inTable('2026-01-02T03:04:06Z')).toBe(true)
++  // the Conditions header is present and distinct from the metadata table.
++  const headers = screen.getAllByRole('columnheader').map((th) => th.textContent)
++  expect(headers).toContain('Last Transition Time')
++  expect(headers).toContain('Reason')
++})
++
++test('vpa-data-container-policies', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [webVpa] }),
++    ),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerDataView />, dataPath)
++
++  await screen.findByText('app', { selector: 'td' })
++  // Min/Max Allowed render "resource: value" lines; Controlled Resources
++  // joined by ", ".
++  expect(screen.getByText('memory: 128Mi')).toBeTruthy()
++  expect(screen.getByText('memory: 1Gi')).toBeTruthy()
++  expect(screen.getByText('cpu, memory')).toBeTruthy()
++})
++
++test('vpa-data-missing-policy', async () => {
++  // No resourcePolicy and no status.conditions: both tables degrade to
++  // their pinned empty states (certainty rule: never guess).
++  const bare = {
++    ...webVpa,
++    spec: { targetRef: { kind: 'Deployment', name: 'web', apiVersion: 'apps/v1' } },
++    status: {},
++  }
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [bare] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(<VerticalPodAutoscalerDataView />, dataPath)
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('"targetRef"')
++  })
++  expect(screen.getByText('No container policies')).toBeTruthy()
++  expect(screen.getByText('No conditions')).toBeTruthy()
++  // Update Mode is absent from spec: 4.1's N/A literal.
++  expect(screen.getByText('N/A')).toBeTruthy()
++})
++
++test('vpa-data-not-found-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items: [] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <VerticalPodAutoscalerDataView />,
++    '/other-resource/vertical-pod-autoscaler/data?name=ghost&namespace=team-a',
++  )
++
++  // empty items upstream is a state, not an error: pinned copy, no
++  // error styling (also the CRD-absent state — the backend returns []
++  // in both cases).
++  expect(await screen.findByText("No VerticalPodAutoscaler 'ghost' found")).toBeTruthy()
++  expect(container.querySelector('.text-danger')).toBeNull()
++})
++
++test('vpa-data-missing-name', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerDataView />, '/other-resource/vertical-pod-autoscaler/data')
++
++  expect(await screen.findByText('Error: vertical pod autoscaler name not provided')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no fetch
++})
+diff --git a/frontend/tests/views/vertical_pod_autoscalers.test.tsx b/frontend/tests/views/vertical_pod_autoscalers.test.tsx
+new file mode 100644
+index 00000000..c05b74ee
+--- /dev/null
++++ b/frontend/tests/views/vertical_pod_autoscalers.test.tsx
+@@ -0,0 +1,274 @@
++import { render, screen } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test, vi } from 'vitest'
++import { server } from '../msw'
++import VerticalPodAutoscalerView from '../../src/views/OtherResource/VerticalPodAutoscaler'
++import { useClusterStore } from '../../src/store/cluster'
++
++// Same KubeDataTable fake as network_policies.test.tsx: renders the real row
++// mapping (children-as-render-fns included) so cell assertions test the
++// view's `toRow` output, not DataTables' DOM. The factory is async: a
++// hoisted mock may not touch module-scope consts, so react is imported
++// inline (`vi.mock` calls are hoisted above the imports below).
++vi.mock('../../src/components/KubeDataTable', async () => {
++  const React = (await import('react')) as typeof import('react')
++  const Column = () => null
++  function KubeDataTable({
++    data,
++    children,
++  }: {
++    data: Record<string, unknown>[]
++    children: React.ReactNode
++  }) {
++    const cols = React.Children.toArray(children)
++      .filter(React.isValidElement)
++      .map(
++        (child) =>
++          (
++            child as React.ReactElement<{
++              title: string
++              data: string | null
++              children?: unknown
++            }>
++          ).props,
++      )
++    return (
++      <table>
++        <thead>
++          <tr>
++            {cols.map((col) => (
++              <th key={col.title}>{col.title}</th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {data.map((row, i) => (
++            <tr key={i}>
++              {cols.map((col) => {
++                // `data={null}` hands the render fn the whole row (the
++                // datatables.net-react contract, see Namespaces.tsx).
++                const value = col.data === null ? row : row[col.data]
++                const node =
++                  typeof col.children === 'function'
++                    ? (col.children as (v: unknown) => React.ReactNode)(value)
++                    : (value as React.ReactNode)
++                return <td key={col.title}>{node ?? ''}</td>
++              })}
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    )
++  }
++  return { default: KubeDataTable, Column }
++})
++
++const renderAt = (ui: ReactElement, path = '/other-resource/vertical-pod-autoscaler') => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// The VPA CRD's full custom object: camelCase (the custom-object wire form).
++const webVpa = {
++  apiVersion: 'autoscaling.k8s.io/v1',
++  kind: 'VerticalPodAutoscaler',
++  metadata: {
++    name: 'web-vpa',
++    namespace: 'team-a',
++    creationTimestamp: '2026-01-02T03:04:05Z',
++    labels: { team: 'a' },
++    annotations: { 'vpa.kubernetes.io/managed-by': 'kubedash' },
++  },
++  spec: {
++    targetRef: { kind: 'Deployment', name: 'web', apiVersion: 'apps/v1' },
++    updatePolicy: { updateMode: 'Auto' },
++    resourcePolicy: {
++      containerPolicies: [
++        {
++          containerName: 'app',
++          controlledValues: 'RequestsLimits',
++          mode: 'Auto',
++          minAllowed: { memory: '128Mi' },
++          maxAllowed: { memory: '1Gi' },
++          controlledResources: ['cpu', 'memory'],
++        },
++      ],
++    },
++  },
++  status: {
++    conditions: [
++      {
++        type: 'RecommendationProvided',
++        status: 'True',
++        lastTransitionTime: '2026-01-02T03:04:06Z',
++        reason: 'RecommendationAvailable',
++        message: 'ok',
++      },
++    ],
++  },
++}
++
++const vpaListResponse = (items: unknown[]) =>
++  HttpResponse.json({ kind: 'verticalpodautoscalers', cluster: 'prod', items })
++
++test('vpa-list-renders-rows-with-data-links', async () => {
++  let fetchedUrl = ''
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', ({ request }) => {
++      fetchedUrl = new URL(request.url).pathname + new URL(request.url).search
++      return vpaListResponse([webVpa])
++    }),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerView />)
++
++  const link = await screen.findByRole('link', { name: 'web-vpa' })
++  // the list view is the sole producer of the data page's query strings.
++  expect(link.getAttribute('href')).toBe(
++    '/other-resource/vertical-pod-autoscaler/data?name=web-vpa&namespace=team-a',
++  )
++  // fetch URL EXACTLY: the namespaced CRD kind with the header's namespace.
++  expect(fetchedUrl).toBe('/api/v1/clusters/1/resources/verticalpodautoscalers?namespace=team-a')
++  // card title EXACTLY (the e2e smoke asserts it with exact: true).
++  expect(screen.getAllByText('Vertical Pod Autoscaler List', { exact: true }).length).toBeGreaterThanOrEqual(1)
++  // breadcrumb: Other Resources.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  // columns, in order.
++  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
++    'Name',
++    'Namespace',
++    'Target Kind',
++    'Target Name',
++    'Update Mode',
++    'Min Memory',
++    'Max Memory',
++    'Created',
++  ])
++  // created is rendered by formatTimestamp (no raw ISO 'T' in the row).
++  const row = link.closest('tr')
++  expect(row?.textContent).not.toContain('2026-01-02T03:04:05Z')
++  expect(row?.textContent).toMatch(/2026/)
++})
++
++test('vpa-list-target-and-memory-cells', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      vpaListResponse([webVpa]),
++    ),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerView />)
++
++  await screen.findByRole('link', { name: 'web-vpa' })
++  const row = screen.getByRole('link', { name: 'web-vpa' }).closest('tr')
++  // Target Kind from spec.targetRef.kind; Update Mode from
++  // spec.updatePolicy.updateMode; Min/Max Memory from the container policy.
++  expect(row?.textContent).toContain('Deployment')
++  expect(row?.textContent).toContain('Auto')
++  expect(row?.textContent).toContain('128Mi')
++  expect(row?.textContent).toContain('1Gi')
++  // Target Name (spec.targetRef.name) is PLAIN TEXT: 4.1 linked it to a
++  // workload page 5.0 does not have yet — only the VPA name is a link.
++  expect(row?.querySelectorAll('a')).toHaveLength(1)
++  expect(screen.getByText('web')).not.toHaveAttribute('href')
++})
++
++test('vpa-list-last-container-memory-semantics', async () => {
++  // 4.1's {% set %} overwrite: the LAST container policy that defines the
++  // key wins (the first 64Mi must not survive).
++  const twoPolicies = {
++    ...webVpa,
++    metadata: { ...webVpa.metadata, name: 'two-vpa' },
++    spec: {
++      ...webVpa.spec,
++      resourcePolicy: {
++        containerPolicies: [
++          { containerName: 'first', minAllowed: { memory: '64Mi' }, maxAllowed: { memory: '512Mi' } },
++          { containerName: 'second', minAllowed: { memory: '256Mi' } },
++        ],
++      },
++    },
++  }
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      vpaListResponse([twoPolicies]),
++    ),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerView />)
++
++  const link = await screen.findByRole('link', { name: 'two-vpa' })
++  const row = link.closest('tr')
++  expect(row?.textContent).toContain('256Mi')
++  expect(row?.textContent).not.toContain('64Mi')
++  expect(row?.textContent).toContain('512Mi')
++})
++
++test('vpa-list-missing-update-policy', async () => {
++  const noPolicy = {
++    ...webVpa,
++    metadata: { ...webVpa.metadata, name: 'no-upd' },
++    spec: {
++      targetRef: { kind: 'Deployment', name: 'web', apiVersion: 'apps/v1' },
++      // no updatePolicy
++    },
++  }
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      vpaListResponse([noPolicy]),
++    ),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerView />)
++
++  const link = await screen.findByRole('link', { name: 'no-upd' })
++  const row = link.closest('tr')
++  // 4.1's literal for the absent value: N/A (certainty rule: never guess).
++  expect(row?.textContent).toContain('N/A')
++})
++
++test('vpa-list-no-cluster-state', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++  renderAt(<VerticalPodAutoscalerView />)
++
++  expect(await screen.findByText('No cluster selected.')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no resource fetch is made
++})
++
++test('vpa-list-empty-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/verticalpodautoscalers', () =>
++      vpaListResponse([]),
++    ),
++  )
++  selectProd()
++  renderAt(<VerticalPodAutoscalerView />)
++
++  // Also the CRD-absent state: the page does not distinguish "no VPAs"
++  // from "operator not installed" — one pinned empty-state copy.
++  expect(await screen.findByText('No vertical pod autoscalers found')).toBeTruthy()
++})

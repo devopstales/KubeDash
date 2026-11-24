@@ -321,32 +321,34 @@ class K8sClient:
             raise AssertionError("unreachable") from e
         return [p.to_dict() for p in resp.items]
 
-    def get_pod(self, namespace: str, name: str) -> dict[str, Any] | None:
-        """One pod as a dict; ``None`` on 404 (the HA status candidates
-        read treats absence as a null, not an error). ``_request_timeout``
-        bounds a hung apiserver — the candidates read is best-effort and
-        must not pin a worker thread indefinitely (kubernetes 37 sets no
-        default timeout)."""
+    def get_pod(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One pod as a 0/1-item list (the generic resource route's
+        ``items`` contract); ``[]`` on 404. Shared by the ``?name=`` pods
+        route (the pods-deployments-views change) and the HA status
+        candidates read (absence is a null, not an error).
+        ``_request_timeout`` bounds a hung apiserver for the best-effort
+        candidates read — kubernetes 37 sets no default timeout, and the
+        route's single-object read tolerates the bound."""
         try:
             item = self._v1.read_namespaced_pod(name, namespace, _request_timeout=2)
         except ApiException as e:
             if e.status == 404:
-                return None
+                return []
             self._unreachable("get_pod", e)
             raise AssertionError("unreachable") from e
-        return item.to_dict()
+        return [item.to_dict()]
 
-    def get_deployment(self, namespace: str, name: str) -> dict[str, Any] | None:
-        """One Deployment as a dict; ``None`` on 404 (same contract as
-        ``get_pod``)."""
+    def get_deployment(self, namespace: str, name: str) -> list[dict[str, Any]]:
+        """One Deployment as a 0/1-item list (same contract as
+        ``get_pod``); ``[]`` on 404."""
         try:
             item = self._apps.read_namespaced_deployment(name, namespace, _request_timeout=2)
         except ApiException as e:
             if e.status == 404:
-                return None
+                return []
             self._unreachable("get_deployment", e)
             raise AssertionError("unreachable") from e
-        return item.to_dict()
+        return [item.to_dict()]
 
     def list_namespaces(self, _namespace: str | None) -> list[dict[str, Any]]:
         """Namespace list for the header selector. The resource route always
@@ -2101,6 +2103,23 @@ class K8sClient:
                 return []
             self._unreachable("get_ingress_class", e)
             raise AssertionError("unreachable") from e
+
+    def list_deployments(self, namespace: str | None) -> list[dict[str, Any]]:
+        """Deployment list in the standard kubernetes dict form (``to_dict``)
+        for one namespace, or across all namespaces when the namespace is
+        ``None`` (the ``list_horizontal_pod_autoscalers`` branch). Apps/v1,
+        namespaced (the 4.1-parity /workload/deployments views). A transport
+        ApiException maps to ``ClusterUnreachableError`` (502)."""
+        try:
+            resp = (
+                self._apps.list_namespaced_deployment(namespace)
+                if namespace
+                else self._apps.list_deployment_for_all_namespaces()
+            )
+        except ApiException as e:
+            self._unreachable("list_deployments", e)
+            raise AssertionError("unreachable") from e
+        return [d.to_dict() for d in resp.items]
 
     def list_horizontal_pod_autoscalers(self, namespace: str | None) -> list[dict[str, Any]]:
         """HorizontalPodAutoscaler list in the standard kubernetes dict form

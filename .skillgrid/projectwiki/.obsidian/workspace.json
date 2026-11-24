@@ -157,7 +157,6 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "index.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -167,13 +166,13 @@
             }
           },
           {
-            "id": "6501288c73505c1d",
+            "id": "a9c344d712e36c98",
             "type": "leaf",
             "state": {
-              "type": "backlogmd-backlog",
+              "type": "backlogmd-milestones",
               "state": {},
               "icon": "lucide-file",
-              "title": "Backlog List"
+              "title": "Milestones"
             }
           }
         ],
@@ -181,7 +180,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200,
+    "collapsed": true
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -194,15 +194,16 @@
       "bases:Create new base": false
     }
   },
-  "active": "6501288c73505c1d",
+  "active": "eb3197025e69b140",
   "lastOpenFiles": [
+    "backlog/tasks/task-103 - Manual-acceptance-pass-ns_select-persistence-reload-matrix.md",
+    "ARCHITECTURE.md",
     "Untitled.base",
     "Untitled.canvas",
     "backlog/tasks/task-109 - FEATURE-TICKET-07-remove-Redis-two-node-pgEdge-dev-compose-infra.md",
     "backlog/tasks/task-108 - FEATURE-TICKET-06-wire-auth-RBAC-to-Postgres-backend-auth.md",
     "backlog/tasks/task-107 - FEATURE-TICKET-04-kvstore-revocation-OIDC-state-jti-deny-list-backend-core.md",
     "backlog/tasks/task-106 - FEATURE-TICKET-05-wsgi.py-pgqueue-worker-leader-gated-reaper-replace-RQ-backend-wsgi.md",
-    "backlog/tasks/task-103 - Manual-acceptance-pass-ns_select-persistence-reload-matrix.md",
     "backlog/tasks/task-102 - Write-audit-rows-for-POST-resources-apply-first-generic-cluster-write-path-review-2026-11-09.md",
     "backlog/tasks/task-101 - Rename-registry-kind-bgppeers-to-bgppeer-glossary-singular-slug-review-2026-11-09.md",
     "backlog/tasks/task-100 - Convert-cert-manager-Secret-deep-links-to-openObject-buttons-ADR-0040-R1-review-2026-11-09.md",

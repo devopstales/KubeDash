@@ -139,6 +139,15 @@ function expectedStubs() {
     // same promotion + R7 redirect shape as cert-manager.
     '/network/external-loadbalancer',
     '/network/external-loadbalancer/data',
+    // Real view (2026-10-28-pods-deployments-views) — the stub route is
+    // removed (promoted to the real view); the /data URL is its R7 redirect
+    // (hydrates the ref from ?name=/?namespace=).
+    '/workload/pods',
+    '/workload/pods/data',
+    // Real view (2026-10-28-pods-deployments-views) — same promotion + R7
+    // redirect shape as pods.
+    '/workload/deployments',
+    '/workload/deployments/data',
   ])
   const seen = new Map<string, string>()
   for (const isAdmin of [true, false]) {
@@ -161,14 +170,14 @@ function expectedStubs() {
 
 test('stub-page-names-the-entry', () => {
   render(
-    <MemoryRouter initialEntries={['/workload/pods']}>
+    <MemoryRouter initialEntries={['/workload/statefulsets']}>
       <Routes>
-        <Route path="/workload/pods" element={<StubView title="Pods" />} />
+        <Route path="/workload/statefulsets" element={<StubView title="StatefulSets" />} />
         <Route path="*" element={<p>redirected</p>} />
       </Routes>
     </MemoryRouter>,
   )
-  expect(screen.getByRole('heading', { name: 'Pods' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'StatefulSets' })).toBeTruthy()
   expect(screen.getByText('This view is not available yet.')).toBeTruthy()
   expect(screen.queryByText('redirected')).toBeNull()
 })

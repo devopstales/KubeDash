@@ -1,0 +1,1308 @@
+diff --git a/backend/app/api/resources.py b/backend/app/api/resources.py
+index 36c640c6..3d4bc723 100644
+--- a/backend/app/api/resources.py
++++ b/backend/app/api/resources.py
+@@ -87,6 +87,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
+         "horizontalpodautoscalers",
+         "",
+     ),
++    # LimitRange (core, namespaced) — the 4.1-parity nav leaf resolved by
++    # TASK-054 (list + data views; ADR-0022 placement). The 4.1 route name was
++    # singular; the API kind is the plural.
++    "limitranges": ("list_limit_ranges", "limitranges", ""),
+ }
+ 
+ #: kind → K8sClient method for a single-object ``?name=`` lookup
+@@ -101,6 +105,7 @@ _GETTERS: dict[str, str] = {
+     "poddisruptionbudgets": "get_pod_disruption_budget",
+     "verticalpodautoscalers": "get_vertical_pod_autoscaler",
+     "horizontalpodautoscalers": "get_horizontal_pod_autoscaler",
++    "limitranges": "get_limit_range",
+ }
+ 
+ 
+diff --git a/backend/app/services/k8s_client.py b/backend/app/services/k8s_client.py
+index 311daa7d..434d9ffe 100644
+--- a/backend/app/services/k8s_client.py
++++ b/backend/app/services/k8s_client.py
+@@ -971,6 +971,40 @@ class K8sClient:
+             self._unreachable("get_runtime_class", e)
+             raise AssertionError("unreachable") from e
+ 
++    # The blueprint's service-test seam is the namespace branch only
++    # (list_namespaced_limit_range); the all-namespaces branch matches the
++    # other namespaced kinds (list_secrets/list_network_policies) and is
++    # exercised by the API-tier FakeK8s, whose team-b item the
++    # all-namespaces test asserts.
++    def list_limit_ranges(self, namespace: str | None) -> list[dict[str, Any]]:
++        """LimitRange list in the standard kubernetes dict form (``to_dict``)
++        for one namespace, or across all namespaces when the namespace is
++        ``None`` (the ``list_secrets`` branch). No field stripping — the
++        view renders ``spec.limits`` and the data page the full object. A
++        transport ApiException maps to ``ClusterUnreachableError`` (502)."""
++        try:
++            resp = (
++                self._v1.list_namespaced_limit_range(namespace)
++                if namespace
++                else self._v1.list_limit_range_for_all_namespaces()
++            )
++        except ApiException as e:
++            self._unreachable("list_limit_ranges", e)
++            raise AssertionError("unreachable") from e
++        return [lr.to_dict() for lr in resp.items]
++
++    def get_limit_range(self, namespace: str, name: str) -> list[dict[str, Any]]:
++        """One LimitRange as a 0/1-item list; ``[]`` on 404. Any other
++        ApiException maps to ``ClusterUnreachableError`` (502), matching
++        ``get_network_policy``'s transport contract."""
++        try:
++            return [self._v1.read_namespaced_limit_range(name, namespace).to_dict()]
++        except ApiException as e:
++            if e.status == 404:
++                return []
++            self._unreachable("get_limit_range", e)
++            raise AssertionError("unreachable") from e
++
+     def readyz(self) -> bool:
+         """GET ``<host>/readyz`` with the kubeconfig's CA as ``verify=`` and a
+         5 s timeout; ANY failure (including timeout) returns ``False`` — the
+diff --git a/backend/tests/api/test_resources.py b/backend/tests/api/test_resources.py
+index 397aa2fe..02ba44f1 100644
+--- a/backend/tests/api/test_resources.py
++++ b/backend/tests/api/test_resources.py
+@@ -555,6 +555,48 @@ class FakeK8s:
+             return self.list_horizontal_pod_autoscalers(namespace)
+         return []
+ 
++    def list_limit_ranges(self, namespace: str | None) -> list[dict]:
++        # Namespaced kind (core): the namespace is forwarded (the real
++        # K8sClient.list_limit_ranges pattern). The all-namespaces branch is
++        # DISTINCTLY named (team-b) so the API tests can tell the branches
++        # apart, mirroring list_network_policies.
++        self.limitrange_ns_calls: list[str | None] = []
++        self.limitrange_ns_calls.append(namespace)
++        if namespace is None:
++            return [
++                {
++                    "metadata": {"name": "default", "namespace": "team-b"},
++                    "spec": {"limits": [{"type": "Container", "max": {"memory": "4Gi"}}]},
++                },
++            ]
++        return [
++            {
++                "metadata": {
++                    "name": "default",
++                    "namespace": namespace or "team-a",
++                    "creation_timestamp": "2026-01-02T03:04:05Z",
++                    "labels": {"app": "limits"},
++                },
++                "spec": {
++                    "limits": [
++                        {
++                            "type": "Container",
++                            "max": {"cpu": "2", "memory": "4Gi"},
++                            "min": {"cpu": "500m", "memory": "1Gi"},
++                            "default": {"cpu": "1", "memory": "2Gi"},
++                            "defaultRequest": {"cpu": "250m", "memory": "512Mi"},
++                            "maxLimitRequestRatio": {"cpu": "2", "memory": "4"},
++                        }
++                    ]
++                },
++            }
++        ]
++
++    def get_limit_range(self, namespace: str, name: str) -> list[dict]:
++        if name == "default":
++            return self.list_limit_ranges(namespace)
++        return []
++
+     def readyz(self) -> bool:
+         return True
+ 
+@@ -2109,6 +2151,117 @@ def test_horizontalpodautoscaler_kind_singular_rejected(api_client, auth_client)
+     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+ 
+ 
++def test_list_limitranges_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
++    """[limitranges-list-200] a bound user listing limitranges in one
++    namespace gets the to_dict items back, spec.limits intact; the namespace
++    is forwarded to the client."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get("/api/v1/clusters/1/resources/limitranges?namespace=team-a", headers=h)
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "limitranges"
++    [item] = body["items"]
++    assert item["metadata"]["name"] == "default"
++    assert item["metadata"]["namespace"] == "team-a"
++    [limit] = item["spec"]["limits"]
++    assert limit["type"] == "Container"
++    assert limit["max"] == {"cpu": "2", "memory": "4Gi"}
++    assert limit["min"] == {"cpu": "500m", "memory": "1Gi"}
++    assert limit["defaultRequest"] == {"cpu": "250m", "memory": "512Mi"}
++
++
++def test_list_limitranges_respects_namespace(api_client, auth_client, fake_k8s, monkeypatch) -> None:
++    """[limitranges-list-respects-namespace] the kind is NAMESPACED: the
++    query namespace reaches the client (the contrast to priorityclasses'
++    ignores-namespace)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get("/api/v1/clusters/1/resources/limitranges?namespace=team-a", headers=h)
++    assert r.status_code == 200
++    assert fake_k8s.limitrange_ns_calls == ["team-a"]
++
++
++def test_list_limitranges_all_namespaces_without_param(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[limitranges-list-200] no namespace query hits the all-namespaces
++    branch: the FakeK8s receives None and the distinctly-named team-b item
++    is present."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get("/api/v1/clusters/1/resources/limitranges", headers=h)
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "limitranges"
++    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
++    assert fake_k8s.limitrange_ns_calls == [None]
++
++
++def test_list_limitranges_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
++    """[limitranges-get-by-name] ?name= returns a 0/1-item list: a hit
++    returns the one object in team-a, a miss returns [] (mirrors
++    get_secret)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/limitranges?name=default&namespace=team-a", headers=h
++    )
++    assert r.status_code == 200
++    [item] = r.get_json()["items"]
++    assert item["metadata"]["name"] == "default"
++    assert item["metadata"]["namespace"] == "team-a"
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/limitranges?name=ghost&namespace=team-a", headers=h
++    )
++    assert r.status_code == 200
++    assert r.get_json()["items"] == []
++
++
++def test_list_limitranges_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
++    """[limitranges-sar-denied] ADR-0004: the SAR is asked BEFORE the read,
++    on the CORE group ("") with the query namespace (namespaced kind) — a
++    deny short-circuits to 403 RBAC_DENIED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
++    r = api_client.get("/api/v1/clusters/1/resources/limitranges?namespace=team-a", headers=h)
++    assert r.status_code == 403
++    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
++    # core group + the namespace are the load-bearing assertions:
++    assert ("list", "limitranges", "team-a", None, "") in asked
++
++
++def test_limitranges_binding_404(api_client, auth_client) -> None:
++    """[limitranges-binding-404] an unbound user: the binding gate fails
++    before the SAR, CLUSTER_NOT_FOUND."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    r = api_client.get("/api/v1/clusters/999/resources/limitranges", headers=h)
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
++
++
++def test_limitrange_kind_singular_rejected(api_client, auth_client) -> None:
++    """[limitrange-kind-singular-rejected] the 4.1 route name (singular) is
++    not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    r = api_client.get("/api/v1/clusters/1/resources/limitrange", headers=h)
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
++
++
+ @pytest.mark.integration
+ def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
+     cid, kubeconfig = kind_client
+diff --git a/backend/tests/services/test_k8s_client_limitranges.py b/backend/tests/services/test_k8s_client_limitranges.py
+new file mode 100644
+index 00000000..68f97237
+--- /dev/null
++++ b/backend/tests/services/test_k8s_client_limitranges.py
+@@ -0,0 +1,80 @@
++from types import SimpleNamespace
++
++import pytest
++from kubernetes.client.exceptions import ApiException
++
++from app.core.errors import ClusterUnreachableError
++from app.services.k8s_client import K8sClient
++
++LR = {"metadata": {"name": "default", "namespace": "team-a"},
++      "spec": {"limits": [{"type": "Container",
++                           "max": {"cpu": "2", "memory": "4Gi"},
++                           "min": {"cpu": "500m", "memory": "1Gi"}}]}}
++
++
++def _client(v1: object) -> K8sClient:
++    client = object.__new__(K8sClient)
++    client._v1 = v1
++    return client
++
++
++def test_list_limit_ranges_uses_namespace() -> None:
++    """[limitranges-list-respects-namespace] namespaced kind: the
++    namespace argument drives ``list_namespaced_limit_range`` (the
++    ``list_network_policies`` pattern — NOT the accept-and-ignore
++    cluster-scoped one)."""
++    seen: list[object] = []
++    item = SimpleNamespace(to_dict=lambda: dict(LR))
++    v1 = SimpleNamespace(
++        list_namespaced_limit_range=lambda ns: (seen.append(ns), SimpleNamespace(items=[item]))[1],
++    )
++    result = _client(v1).list_limit_ranges("team-a")
++    assert result == [LR]
++    assert seen == ["team-a"]  # the namespace was passed through
++
++
++def test_list_limit_ranges_all_namespaces_when_none() -> None:
++    """[limitranges-list-200] no namespace hits the all-namespaces branch
++    (the ``list_secrets`` branch)."""
++    seen: list[object] = []
++    item = SimpleNamespace(to_dict=lambda: dict(LR))
++    v1 = SimpleNamespace(
++        list_limit_range_for_all_namespaces=lambda: (
++            seen.append(True),
++            SimpleNamespace(items=[item]),
++        )[1],
++    )
++    assert _client(v1).list_limit_ranges(None) == [LR]
++    assert seen == [True]  # the all-namespaces list was called
++
++
++def test_get_limit_range_hit_returns_one_item() -> None:
++    """[limitranges-get-by-name] a hit is the single object."""
++    item = SimpleNamespace(to_dict=lambda: dict(LR))
++    v1 = SimpleNamespace(read_namespaced_limit_range=lambda name, ns: item)
++    assert _client(v1).get_limit_range("team-a", "default") == [LR]
++
++
++def test_get_limit_range_404_returns_empty_list() -> None:
++    """[limitranges-get-by-name] a miss is ``[]``, mirroring
++    ``get_network_policy``'s 0/1-item contract."""
++    def read(name, ns) -> None:
++        raise ApiException(status=404)
++
++    assert _client(SimpleNamespace(read_namespaced_limit_range=read)).get_limit_range("team-a", "gone") == []
++
++
++def test_get_limit_range_other_api_error_maps_to_unreachable() -> None:
++    def read(name, ns) -> None:
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(read_namespaced_limit_range=read)).get_limit_range("team-a", "default")
++
++
++def test_list_limit_ranges_maps_500_to_unreachable() -> None:
++    def list_all(ns) -> None:
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(list_namespaced_limit_range=list_all)).list_limit_ranges("team-a")
+diff --git a/frontend/e2e/ui-smoke.spec.ts b/frontend/e2e/ui-smoke.spec.ts
+index 2fa883f1..4af0c6ea 100644
+--- a/frontend/e2e/ui-smoke.spec.ts
++++ b/frontend/e2e/ui-smoke.spec.ts
+@@ -47,7 +47,9 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
+   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs' },
+   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget' },
+   { path: '/other-resource/resource-quota', title: 'Resource Quota' },
+-  { path: '/other-resource/limit-range', title: 'Limit Range' },
++  // Stale debt from TASK-046's execution (no longer a stub) — left in place
++  // deliberately; fix in TASK-046's follow-up so this change's diff stays
++  // about LimitRange.
+   { path: '/other-resource/priorityclass', title: 'Priority Classes' },
+   // Admin-gated stubs (render for the bootstrap admin):
+   { path: '/settings/sso-config', title: 'Auth Provider' },
+@@ -80,6 +82,9 @@ const REAL_ROUTES = [
+   '/cluster/namespace/data',
+   '/security/secret',
+   '/security/secret/data',
++  // Limit Range (2026-10-28-limitrange-views): real views, not stubs.
++  '/other-resource/limit-range',
++  '/other-resource/limit-range/data',
+   // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
+   // cluster it renders "No cluster selected." — the mount check below covers
+   // both states (no JS crash either way).
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 4909982b..787198e6 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -60,6 +60,8 @@ const HorizontalPodAutoscalerView = React.lazy(
+ const HorizontalPodAutoscalerDataView = React.lazy(
+   () => import('./views/OtherResource/HorizontalPodAutoscalerData'),
+ )
++const LimitRangeView = React.lazy(() => import('./views/OtherResource/LimitRange'))
++const LimitRangeDataView = React.lazy(() => import('./views/OtherResource/LimitRangeData'))
+ const GroupsView = React.lazy(() => import('./views/Groups'))
+ const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
+ const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
+@@ -473,6 +475,22 @@ const App = () => {
+                         </ProtectedRoute>
+                       }
+                     />
++                    <Route
++                      path="/other-resource/limit-range"
++                      element={
++                        <ProtectedRoute>
++                          <LimitRangeView />
++                        </ProtectedRoute>
++                      }
++                    />
++                    <Route
++                      path="/other-resource/limit-range/data"
++                      element={
++                        <ProtectedRoute>
++                          <LimitRangeDataView />
++                        </ProtectedRoute>
++                      }
++                    />
+                     {stubRoutes.map((route) => (
+                       <Route
+                         key={route.path}
+diff --git a/frontend/src/lib/types.ts b/frontend/src/lib/types.ts
+index 0ab4e82f..11bc4d66 100644
+--- a/frontend/src/lib/types.ts
++++ b/frontend/src/lib/types.ts
+@@ -237,6 +237,30 @@ export interface HorizontalPodAutoscalerItem {
+   [key: string]: unknown
+ }
+ 
++/** One spec.limits[] entry of a LimitRange (kubernetes to_dict). */
++export interface LimitRangeLimitItem {
++  type?: string
++  min?: { cpu?: string; memory?: string }
++  max?: { cpu?: string; memory?: string }
++  default?: { cpu?: string; memory?: string }
++  default_request?: { cpu?: string; memory?: string }
++  max_limit_request_ratio?: { cpu?: string; memory?: string }
++  [key: string]: unknown
++}
++
++/** A LimitRange item as returned by /api/v1/clusters/<id>/resources/limitranges (kubernetes to_dict, snake_case; namespaced, core group). */
++export interface LimitRangeItem {
++  metadata?: {
++    name?: string
++    namespace?: string
++    creation_timestamp?: string
++    labels?: Record<string, string>
++    annotations?: Record<string, string>
++  }
++  spec?: { limits?: LimitRangeLimitItem[] }
++  [key: string]: unknown
++}
++
+ /** A CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy item (full CRD to_dict). */
+ export interface CiliumPolicyItem {
+   metadata?: {
+diff --git a/frontend/src/views/OtherResource/LimitRange.tsx b/frontend/src/views/OtherResource/LimitRange.tsx
+new file mode 100644
+index 00000000..733b75c0
+--- /dev/null
++++ b/frontend/src/views/OtherResource/LimitRange.tsx
+@@ -0,0 +1,102 @@
++import React from 'react'
++import { Link } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { apiFetch } from '../../lib/api'
++import { formatTimestamp } from '../../lib/format'
++import type { LimitRangeItem, ResourceList } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import KubeDataTable, { Column } from '../../components/KubeDataTable'
++import TopMenu from '../../components/TopMenu'
++
++type LimitRangeRow = {
++  name: string
++  namespace: string
++  created: string
++}
++
++const toRow = (item: LimitRangeItem, namespace: string): LimitRangeRow => ({
++  name: item.metadata?.name ?? '',
++  namespace: item.metadata?.namespace ?? namespace,
++  created: formatTimestamp(item.metadata?.creation_timestamp),
++})
++
++/**
++ * 4.1 `other-resources/limit_range.html.j2`: LimitRanges in the
++ * header-selected namespace (the Secret/NetworkPolicy pattern for
++ * namespaced kinds — the namespace comes from the 5.0 cluster store, not
++ * 4.1's per-page `ns_select` form). A name opens the limit range data
++ * page and is the SOLE producer of its `?name=`/`?namespace=` query
++ * strings. The columns keep 4.1's Name / Namespace / Created set (the
++ * limits table lives on the data page). The card title is EXACTLY "Limit
++ * Ranges": the e2e smoke (ui-smoke.spec.ts) asserts that string with
++ * exact: true. Placement under Other Resources is a ratified deviation
++ * (ADR-0022, 2026-10-27): 4.1's API already lived in other-resources.
++ */
++const LimitRangeView = () => {
++  const cluster = useClusterStore((s) => s.selectedCluster)
++  const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
++
++  const query = useQuery<LimitRangeRow[]>({
++    queryKey: ['limitranges', cluster?.id, namespace],
++    enabled: cluster != null,
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<LimitRangeItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/limitranges?namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      return (r.data?.items ?? []).map((item) => toRow(item, namespace))
++    },
++  })
++
++  const nameLink = (name: string) =>
++    name ? (
++      <Link
++        to={`/other-resource/limit-range/data?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`}
++      >
++        {name}
++      </Link>
++    ) : null
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem active>Limit Ranges</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">Limit Ranges</CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading limit ranges...</div>
++        ) : query.error ? (
++          <div className="text-danger">Error loading limit ranges: {query.error.message}</div>
++        ) : (query.data ?? []).length === 0 ? (
++          <div className="text-center text-muted">No limit ranges found</div>
++        ) : (
++          <KubeDataTable data={query.data ?? []}>
++            <Column title="Name" data="name">
++              {nameLink}
++            </Column>
++            <Column title="Namespace" data="namespace" />
++            <Column title="Created" data="created" />
++          </KubeDataTable>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default LimitRangeView
+diff --git a/frontend/src/views/OtherResource/LimitRangeData.tsx b/frontend/src/views/OtherResource/LimitRangeData.tsx
+new file mode 100644
+index 00000000..915eaeda
+--- /dev/null
++++ b/frontend/src/views/OtherResource/LimitRangeData.tsx
+@@ -0,0 +1,248 @@
++import React from 'react'
++import { Link, useSearchParams } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++  CTable,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
++import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
++import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
++import { apiFetch } from '../../lib/api'
++import type { LimitRangeItem, ResourceList } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import TopMenu from '../../components/TopMenu'
++
++// Same pattern as SecretData.tsx / PriorityClassData.tsx: the hljs language
++// module is a singleton, so a second registration is harmless. Register
++// `json` — the block is `JSON.stringify` of the to_dict object (a YAML
++// subset), so the json grammar is the truthful classifier for the exact
++// text rendered (ratified 2026-10-28, PriorityClassData final review).
++SyntaxHighlighter.registerLanguage('json', json)
++
++const NOT_FOUND = 'not found'
++
++type LimitPair = { cpu?: string; memory?: string } | undefined
++
++/**
++ * 4.1 `other-resources/limit_range-data.html.j2` parity: one LimitRange's
++ * metadata, the Container Limits table, and the full object as a
++ * syntax-highlighted block. The read is a SINGLE `?name=` fetch (not 4.1's
++ * list-then-filter); the kind is namespaced, so the namespace resolves
++ * `?namespace=` → store → `default` (the SecretData pattern) and the URL
++ * carries it. Empty `items` is a not-found STATE (pinned copy), not an
++ * error. The list view's name links are the sole producer of these query
++ * strings. The limits table iterates `spec.limits[]` by each entry's `type`
++ * field (4.1 hardcoded cpu+memory rows; the rendered output for standard
++ * LimitRanges is identical) and renders absent fields as `None` (4.1's
++ * pinned copy).
++ */
++const LimitRangeDataView = () => {
++  const [params] = useSearchParams()
++  const name = params.get('name') ?? ''
++  const selectedNamespace = useClusterStore((s) => s.selectedNamespace)
++  const namespace = params.get('namespace') || selectedNamespace || 'default'
++  const cluster = useClusterStore((s) => s.selectedCluster)
++
++  const query = useQuery<LimitRangeItem>({
++    queryKey: ['limit-range-data', cluster?.id, namespace, name],
++    enabled: cluster != null && name !== '',
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<LimitRangeItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/limitranges?namespace=${encodeURIComponent(namespace)}&name=${encodeURIComponent(name)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      const [item] = r.data?.items ?? []
++      if (!item) throw new Error(NOT_FOUND)
++      return item
++    },
++  })
++
++  const item = query.data
++  const labels = Object.entries(item?.metadata?.labels ?? {})
++  const annotations = Object.entries(item?.metadata?.annotations ?? {})
++
++  // The 4.1 Container Limits table: one row per spec.limits[] entry, the
++  // entry's `type` naming the resource (absent type → cpu + memory rows,
++  // 4.1's hardcoded output). `pair` renders `cpu / memory` compact; absent
++  // fields render None (4.1's pinned copy).
++  const pair = (v: LimitPair): string => {
++    if (!v) return 'None'
++    const parts = [v.cpu, v.memory].filter(Boolean)
++    return parts.length > 0 ? parts.join(' / ') : 'None'
++  }
++  const limitsRows: { key: string; resource: string; min: string; max: string; def: string; defReq: string; ratio: string }[] = []
++  for (const entry of item?.spec?.limits ?? []) {
++    const resources = entry.type ? [entry.type] : ['cpu', 'memory']
++    for (const r of resources) {
++      limitsRows.push({
++        key: `${entry.type ?? 'entry'}-${r}-${limitsRows.length}`,
++        resource: r,
++        min: pair(entry.min),
++        max: pair(entry.max),
++        def: pair(entry.default),
++        defReq: pair(entry.default_request),
++        ratio: pair(entry.max_limit_request_ratio),
++      })
++    }
++  }
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem>
++            <Link to="/other-resource/limit-range">Limit Ranges</Link>
++          </CBreadcrumbItem>
++          <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">Limit Range Data</CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!name ? (
++          <div className="text-danger">Error: limit range name not provided</div>
++        ) : !cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading limit range data...</div>
++        ) : query.error ? (
++          query.error.message === NOT_FOUND ? (
++            <div className="text-center text-muted">No LimitRange '{name}' found</div>
++          ) : (
++            <div className="text-danger">Error loading limit range: {query.error.message}</div>
++          )
++        ) : (
++          <>
++            <CTable bordered>
++              <tbody>
++                <tr>
++                  <th scope="row">Name:</th>
++                  <td>{item?.metadata?.name ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Namespace:</th>
++                  <td>{namespace}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Kind:</th>
++                  <td>LimitRange</td>
++                </tr>
++                <tr>
++                  <th scope="row">Created:</th>
++                  <td>{item?.metadata?.creation_timestamp ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Annotations:</th>
++                  <td>
++                    {annotations.length === 0 ? (
++                      'No annotations'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {annotations.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++                <tr>
++                  <th scope="row">Labels:</th>
++                  <td>
++                    {labels.length === 0 ? (
++                      'No labels'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {labels.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++              </tbody>
++            </CTable>
++            <CCard className="mb-3">
++              <CCardHeader className="py-2">
++                <CCardTitle className="m-0 fw-bold text-primary fs-6">Container Limits</CCardTitle>
++              </CCardHeader>
++              <CCardBody>
++                <CTable bordered>
++                  <thead>
++                    <tr>
++                      <th>Resource</th>
++                      <th>Minimum</th>
++                      <th>Maximum</th>
++                      <th>Default Limit</th>
++                      <th>Default Request</th>
++                      <th>Minimum Limit Request Ratio</th>
++                    </tr>
++                  </thead>
++                  <tbody>
++                    {limitsRows.map((row) => (
++                      <tr key={row.key}>
++                        <td>{row.resource}</td>
++                        <td>{row.min}</td>
++                        <td>{row.max}</td>
++                        <td>{row.def}</td>
++                        <td>{row.defReq}</td>
++                        <td>{row.ratio}</td>
++                      </tr>
++                    ))}
++                  </tbody>
++                </CTable>
++              </CCardBody>
++            </CCard>
++            <CCard className="mb-0">
++              <CCardHeader className="py-2">
++                <CCardTitle className="m-0 fw-bold text-primary fs-6">Limit Range</CCardTitle>
++              </CCardHeader>
++              <CCardBody>
++                <SyntaxHighlighter
++                  language="json"
++                  style={anOldHope}
++                  wrapLongLines
++                  customStyle={{ margin: 0 }}
++                  codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
++                >
++                  {JSON.stringify(item, null, 2)}
++                </SyntaxHighlighter>
++              </CCardBody>
++            </CCard>
++          </>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default LimitRangeDataView
+diff --git a/frontend/src/views/Stub/routes.ts b/frontend/src/views/Stub/routes.ts
+index 8b9044fc..9307b14c 100644
+--- a/frontend/src/views/Stub/routes.ts
++++ b/frontend/src/views/Stub/routes.ts
+@@ -20,7 +20,6 @@ export const stubRoutes: StubRoute[] = [
+   { path: '/storage/volumesnapshot', title: 'VolumeSnapshot', admin: false },
+   { path: '/storage/storage-class', title: 'StorageClass', admin: false },
+   { path: '/storage/snapshot-class', title: 'SnapshotClass', admin: false },
+-  { path: '/other-resource/limit-range', title: 'Limit Range', admin: false },
+   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
+   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
+ ]
+diff --git a/frontend/tests/views/Stub.test.tsx b/frontend/tests/views/Stub.test.tsx
+index 3fbc0794..e6070803 100644
+--- a/frontend/tests/views/Stub.test.tsx
++++ b/frontend/tests/views/Stub.test.tsx
+@@ -71,6 +71,11 @@ function expectedStubs() {
+     // /other-resource/horizontal-pod-autoscaler/data.
+     '/other-resource/horizontal-pod-autoscaler',
+     '/other-resource/horizontal-pod-autoscaler/data',
++    // Real view (2026-10-28-limitrange-views, Task 4) — not a stub route.
++    // The nav leaf targets the list at /other-resource/limit-range; the
++    // detail is /other-resource/limit-range/data.
++    '/other-resource/limit-range',
++    '/other-resource/limit-range/data',
+   ])
+   const seen = new Map<string, string>()
+   for (const isAdmin of [true, false]) {
+diff --git a/frontend/tests/views/limit_range_data.test.tsx b/frontend/tests/views/limit_range_data.test.tsx
+new file mode 100644
+index 00000000..2049c762
+--- /dev/null
++++ b/frontend/tests/views/limit_range_data.test.tsx
+@@ -0,0 +1,259 @@
++import { render, screen, waitFor } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse } from 'msw'
++import type { AnyHandler } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test } from 'vitest'
++import { server } from '../msw'
++import LimitRangeDataView from '../../src/views/OtherResource/LimitRangeData'
++import { useClusterStore } from '../../src/store/cluster'
++
++const renderAt = (ui: ReactElement, path: string) => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// kubernetes to_dict shape: snake_case. Namespaced (core group).
++const limits = {
++  apiVersion: 'v1',
++  kind: 'LimitRange',
++  metadata: {
++    name: 'default',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-02T03:04:05Z',
++    labels: { app: 'limits' },
++  },
++  spec: {
++    limits: [
++      {
++        type: 'Container',
++        max: { cpu: '2', memory: '4Gi' },
++        min: { cpu: '500m', memory: '1Gi' },
++        default: { cpu: '1', memory: '2Gi' },
++        defaultRequest: { cpu: '250m', memory: '512Mi' },
++        maxLimitRequestRatio: { cpu: '2', memory: '4' },
++      },
++    ],
++  },
++}
++
++// kubernetes to_dict renders `defaultRequest`/`maxLimitRequestRatio` in
++// snake_case (default_request / max_limit_request_ratio) — the view reads
++// the to_dict keys, so the fixture mirrors the API's actual serialization.
++const limitsSnake = {
++  ...limits,
++  spec: {
++    limits: [
++      {
++        type: 'Container',
++        max: { cpu: '2', memory: '4Gi' },
++        min: { cpu: '500m', memory: '1Gi' },
++        default: { cpu: '1', memory: '2Gi' },
++        default_request: { cpu: '250m', memory: '512Mi' },
++        max_limit_request_ratio: { cpu: '2', memory: '4' },
++      },
++    ],
++  },
++}
++
++// data-renders-detail
++test('data-renders-detail', async () => {
++  const urls: string[] = []
++  let searchParams = new URLSearchParams()
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
++      const u = new URL(request.url)
++      urls.push(u.href)
++      searchParams = u.searchParams
++      return HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [limitsSnake] })
++    }),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <LimitRangeDataView />,
++    '/other-resource/limit-range/data?name=default&namespace=team-a',
++  )
++
++  // wait for the fetch to land before reading what the view asked for.
++  // The highlighter splits tokens across <code class="hljs-*"> spans, so
++  // `findByText` cannot match a whole token; poll the DOM text instead.
++  await waitFor(() => {
++    expect(container.textContent).toContain('"kind": "LimitRange"')
++  })
++  // single read: EXACTLY ONE fetch, with ?name= AND ?namespace=.
++  expect(urls).toHaveLength(1)
++  expect(searchParams.get('name')).toBe('default')
++  expect(searchParams.get('namespace')).toBe('team-a')
++  // breadcrumb: Other Resources → Limit Ranges → name.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  const listLink = screen.getByRole('link', { name: 'Limit Ranges' })
++  expect(listLink.getAttribute('href')).toBe('/other-resource/limit-range')
++  // metadata table rows: Name, Namespace, Kind, Created. The same values
++  // repeat in the JSON block below, so scope to the metadata table.
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('default')).toBe(true)
++  expect(await inTable('team-a')).toBe(true)
++  expect(await inTable('LimitRange')).toBe(true)
++  // labels sub-table: the `app` key and `limits` value render.
++  expect(await inTable('app')).toBe(true)
++  expect(await inTable('limits')).toBe(true)
++  // absent annotations → the pinned empty copy.
++  expect(await screen.findByText('No annotations')).toBeTruthy()
++  // the full object is rendered as a JSON-highlighted block.
++  const pre = container.querySelector('pre')
++  expect(pre).not.toBeNull()
++  expect(pre!.textContent).toContain('"kind": "LimitRange"')
++})
++
++// data-namespace-falls-back-to-store
++test('data-namespace-falls-back-to-store', async () => {
++  let requestedUrl = ''
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
++      requestedUrl = new URL(request.url).href
++      return HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [limitsSnake] })
++    }),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <LimitRangeDataView />,
++    '/other-resource/limit-range/data?name=default',
++  )
++
++  // wait for the fetch to land before reading what the view asked for.
++  await waitFor(() => {
++    expect(container.textContent).toContain('"kind": "LimitRange"')
++  })
++  // no ?namespace= param: the SecretData resolution order falls back to
++  // the store's selected namespace.
++  expect(requestedUrl).toBe(
++    'http://localhost/api/v1/clusters/1/resources/limitranges?namespace=team-a&name=default',
++  )
++})
++
++// data-limits-table
++test('data-limits-table', async () => {
++  // The data view fetches ONE name; to exercise the absent-field cells,
++  // serve a single item whose second limits entry (type Pod) has only
++  // max.cpu — its remaining columns must render None (4.1's pinned copy).
++  const twoEntries = {
++    ...limitsSnake,
++    spec: {
++      limits: [
++        ...limitsSnake.spec.limits,
++        { type: 'Pod', max: { cpu: '4' } },
++      ],
++    },
++  }
++  const handlers: AnyHandler[] = [
++    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
++      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [twoEntries] }),
++    ),
++  ]
++  server.use(...handlers)
++  selectProd()
++  const { container } = renderAt(
++    <LimitRangeDataView />,
++    '/other-resource/limit-range/data?name=default&namespace=team-a',
++  )
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('Container Limits')
++  })
++  // the Container Limits table renders the entry's `type` as Resource with
++  // the cpu / memory pairs (4.1 parity).
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('Container')).toBe(true)
++  expect(await inTable('500m / 1Gi')).toBe(true)
++  expect(await inTable('2 / 4Gi')).toBe(true)
++  expect(await inTable('1 / 2Gi')).toBe(true)
++  expect(await inTable('250m / 512Mi')).toBe(true)
++  expect(await inTable('2 / 4')).toBe(true)
++  // the Pod entry's absent fields render None (4.1's pinned copy):
++  // min/default/default_request/max_limit_request_ratio are all absent.
++  // The Pod row carries 4 `None` cells next to its `4` maximum.
++  const podRow = [...container.querySelectorAll('tr')].find((tr) =>
++    tr.textContent?.includes('Pod'),
++  )
++  expect(podRow?.textContent).toContain('4')
++  expect(podRow?.textContent).toContain('None')
++})
++
++// data-limits-absent
++test('data-limits-absent', async () => {
++  const noLimits = {
++    apiVersion: 'v1',
++    kind: 'LimitRange',
++    metadata: { name: 'default', namespace: 'team-a' },
++    spec: {},
++  }
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
++      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [noLimits] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <LimitRangeDataView />,
++    '/other-resource/limit-range/data?name=default&namespace=team-a',
++  )
++
++  // an empty limits spec renders no limit rows — not an error.
++  await waitFor(() => {
++    expect(container.textContent).toContain('"kind": "LimitRange"')
++  })
++  expect(container.textContent).not.toContain('Error')
++})
++
++// data-not-found-state
++test('data-not-found-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
++      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <LimitRangeDataView />,
++    '/other-resource/limit-range/data?name=ghost&namespace=team-a',
++  )
++
++  // empty items upstream is a state, not an error: pinned copy, muted, no
++  // error styling.
++  expect(await screen.findByText("No LimitRange 'ghost' found")).toBeTruthy()
++  expect(container.textContent).not.toContain('Error')
++  expect(container.querySelectorAll('.text-danger').length).toBe(0)
++})
++
++// data-missing-name
++test('data-missing-name', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/:kind', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  selectProd()
++  renderAt(<LimitRangeDataView />, '/other-resource/limit-range/data')
++
++  expect(await screen.findByText('Error: limit range name not provided')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no fetch
++})
+diff --git a/frontend/tests/views/limit_ranges.test.tsx b/frontend/tests/views/limit_ranges.test.tsx
+new file mode 100644
+index 00000000..d6389ed5
+--- /dev/null
++++ b/frontend/tests/views/limit_ranges.test.tsx
+@@ -0,0 +1,226 @@
++import { render, screen } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test, vi } from 'vitest'
++import { server } from '../msw'
++import LimitRangeView from '../../src/views/OtherResource/LimitRange'
++import { useClusterStore } from '../../src/store/cluster'
++
++// Same KubeDataTable fake as secrets.test.tsx: renders the real row
++// mapping (children-as-render-fns included) so cell assertions test the
++// view's `toRow` output, not DataTables' DOM. The factory is async: a
++// hoisted mock may not touch module-scope consts, so react is imported
++// inline (`vi.mock` calls are hoisted above the imports below).
++vi.mock('../../src/components/KubeDataTable', async () => {
++  const React = (await import('react')) as typeof import('react')
++  const Column = () => null
++  function KubeDataTable({
++    data,
++    children,
++  }: {
++    data: Record<string, unknown>[]
++    children: React.ReactNode
++  }) {
++    const cols = React.Children.toArray(children)
++      .filter(React.isValidElement)
++      .map(
++        (child) =>
++          (
++            child as React.ReactElement<{
++              title: string
++              data: string | null
++              children?: unknown
++            }>
++          ).props,
++      )
++    return (
++      <table>
++        <thead>
++          <tr>
++            {cols.map((col) => (
++              <th key={col.title}>{col.title}</th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {data.map((row, i) => (
++            <tr key={i}>
++              {cols.map((col) => {
++                // `data={null}` hands the render fn the whole row (the
++                // datatables.net-react contract, see Namespaces.tsx).
++                const value = col.data === null ? row : row[col.data]
++                const node =
++                  typeof col.children === 'function'
++                    ? (col.children as (v: unknown) => React.ReactNode)(value)
++                    : (value as React.ReactNode)
++                return <td key={col.title}>{node ?? ''}</td>
++              })}
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    )
++  }
++  return { default: KubeDataTable, Column }
++})
++
++const renderAt = (ui: ReactElement, path = '/other-resource/limit-range') => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// kubernetes to_dict shape: snake_case. Namespaced (core group).
++const limits = {
++  apiVersion: 'v1',
++  kind: 'LimitRange',
++  metadata: {
++    name: 'default',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-02T03:04:05Z',
++    labels: { app: 'limits' },
++  },
++  spec: {
++    limits: [
++      {
++        type: 'Container',
++        max: { cpu: '2', memory: '4Gi' },
++        min: { cpu: '500m', memory: '1Gi' },
++        default: { cpu: '1', memory: '2Gi' },
++        defaultRequest: { cpu: '250m', memory: '512Mi' },
++        maxLimitRequestRatio: { cpu: '2', memory: '4' },
++      },
++    ],
++  },
++}
++
++// list-renders-limit-ranges
++test('list-renders-limit-ranges', async () => {
++  let requestedPath = ''
++  let requestedUrl = ''
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
++      const u = new URL(request.url)
++      requestedPath = u.pathname
++      requestedUrl = u.href
++      return HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [limits] })
++    }),
++  )
++  selectProd()
++  renderAt(<LimitRangeView />)
++
++  const link = await screen.findByRole('link', { name: 'default' })
++  // the name link is the SOLE producer of the data page's query strings.
++  expect(link.getAttribute('href')).toBe(
++    '/other-resource/limit-range/data?name=default&namespace=team-a',
++  )
++  // namespaced kind: the fetch URL is EXACTLY the kind URL + the selected
++  // namespace (the Secret/NetworkPolicy pattern).
++  expect(requestedPath).toBe('/api/v1/clusters/1/resources/limitranges')
++  expect(requestedUrl).toBe(
++    'http://localhost/api/v1/clusters/1/resources/limitranges?namespace=team-a',
++  )
++
++  // card title: EXACT string (the e2e smoke asserts it with exact: true).
++  // Pinned on the heading specifically: the breadcrumb renders the same
++  // text, and a card-title regression must not survive via the breadcrumb.
++  expect(screen.getByRole('heading', { name: 'Limit Ranges' })).toBeTruthy()
++  // breadcrumb: Other Resources → Limit Ranges.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  // columns: name, namespace, created (4.1's exact list column set).
++  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
++    'Name',
++    'Namespace',
++    'Created',
++  ])
++  // row: the namespace cell, and the created cell rendered by
++  // formatTimestamp (no raw ISO 'T').
++  expect(screen.getByText('team-a')).toBeTruthy()
++  const nameCell = link.closest('tr')
++  expect(nameCell?.textContent).not.toContain('2026-01-02T03:04:05Z')
++  expect(nameCell?.textContent).toMatch(/2026/)
++})
++
++// list-namespace-falls-back-to-default
++test('list-namespace-falls-back-to-default', async () => {
++  let requestedUrl = ''
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
++      requestedUrl = new URL(request.url).href
++      return HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [] })
++    }),
++  )
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: null,
++  })
++  renderAt(<LimitRangeView />)
++
++  await screen.findByText('No limit ranges found')
++  expect(requestedUrl).toBe('http://localhost/api/v1/clusters/1/resources/limitranges?namespace=default')
++})
++
++// list-no-cluster-state
++test('list-no-cluster-state', async () => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  renderAt(<LimitRangeView />)
++
++  expect(await screen.findByText('No cluster selected.')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no resource fetch is made
++})
++
++// list-error-state
++test('list-error-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
++      HttpResponse.json(
++        { error: { code: 'RBAC_DENIED', message: 'list on limitranges' } },
++        { status: 403 },
++      ),
++    ),
++  )
++  selectProd()
++  renderAt(<LimitRangeView />)
++
++  expect(
++    await screen.findByText(/Error loading limit ranges: RBAC_DENIED: list on limitranges/),
++  ).toBeTruthy()
++  // no blank table, no rows.
++  expect(screen.queryAllByRole('link', { name: 'default' })).toHaveLength(0)
++})
++
++// list-empty-state
++test('list-empty-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
++      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [] }),
++    ),
++  )
++  selectProd()
++  renderAt(<LimitRangeView />)
++
++  // an empty list is a first-class state, not an error.
++  expect(await screen.findByText('No limit ranges found')).toBeTruthy()
++})

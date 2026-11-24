@@ -189,18 +189,22 @@ test('data-limits-table', async () => {
   // The data view fetches ONE name; to exercise the absent-field cells,
   // serve a single item whose second limits entry (type Pod) has only
   // max.cpu — its remaining columns must render None (4.1's pinned copy).
-  const twoEntries = {
+  const threeEntries = {
     ...limitsSnake,
     spec: {
       limits: [
         ...limitsSnake.spec.limits,
         { type: 'Pod', max: { cpu: '4' } },
+        // a schema-legal entry WITHOUT `type`: the view's fallback renders
+        // the cpu + memory rows (4.1's hardcoded output — the designated
+        // parity output, pinned by the limitrange-views review fix).
+        { max: { cpu: '4' } },
       ],
     },
   }
   const handlers: AnyHandler[] = [
     http.get('*/api/v1/clusters/1/resources/limitranges', () =>
-      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [twoEntries] }),
+      HttpResponse.json({ kind: 'limitranges', cluster: 'prod', items: [threeEntries] }),
     ),
   ]
   server.use(...handlers)
@@ -229,6 +233,16 @@ test('data-limits-table', async () => {
   )
   expect(podRow?.textContent).toContain('4')
   expect(podRow?.textContent).toContain('None')
+  // the typeless entry renders the view's fallback cpu + memory rows
+  // (4.1's hardcoded output — the designated parity output), not zero rows.
+  const cpuRow = [...container.querySelectorAll('tr')].find((tr) =>
+    tr.textContent?.startsWith('cpu'),
+  )
+  const memoryRow = [...container.querySelectorAll('tr')].find((tr) =>
+    tr.textContent?.startsWith('memory'),
+  )
+  expect(cpuRow?.textContent).toContain('4')
+  expect(memoryRow?.textContent).toContain('4')
 })
 
 // data-limits-absent

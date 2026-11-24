@@ -1,0 +1,4 @@
+7b3e35be feat(frontend): wire pod-disruption-budget routes, remove stub
+305a44c6 feat(frontend): pod disruption budget data view (4.1 tables + JSON block)
+7a1ab3a5 feat(frontend): pod disruption budget list view (4.1 port, namespaced)
+5f1f9244 feat(resources): poddisruptionbudgets kind (policy, namespaced, SAR-gated)

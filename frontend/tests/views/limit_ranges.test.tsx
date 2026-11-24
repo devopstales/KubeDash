@@ -71,8 +71,8 @@ const limits = {
         max: { cpu: '2', memory: '4Gi' },
         min: { cpu: '500m', memory: '1Gi' },
         default: { cpu: '1', memory: '2Gi' },
-        defaultRequest: { cpu: '250m', memory: '512Mi' },
-        maxLimitRequestRatio: { cpu: '2', memory: '4' },
+        default_request: { cpu: '250m', memory: '512Mi' },
+        max_limit_request_ratio: { cpu: '2', memory: '4' },
       },
     ],
   },
@@ -84,10 +84,12 @@ const limits = {
 test('click-name-renders-detail-with-clean-url', async () => {
   const user = userEvent.setup()
   selectProd()
+  const fetchUrls: string[] = []
   server.use(
-    http.get('*/api/v1/clusters/1/resources/limitranges', () =>
-      HttpResponse.json({ items: [limits] }),
-    ),
+    http.get('*/api/v1/clusters/1/resources/limitranges', ({ request }) => {
+      fetchUrls.push(new URL(request.url).href)
+      return HttpResponse.json({ items: [limits] })
+    }),
   )
   renderAt(<LimitRangeView />)
 
@@ -100,6 +102,12 @@ test('click-name-renders-detail-with-clean-url', async () => {
   // clean: no query string (R1).
   expect(await screen.findByText('Limit Range Data')).toBeTruthy()
   expect(window.location.search).toBe('')
+  // The detail fetch carries the ROW's identity — name AND namespace —
+  // so the click-to-detail handoff is asserted end-to-end (the
+  // limitrange-views review fix; the hpa-views identity-pin pattern).
+  const detailFetch = fetchUrls.at(-1)
+  expect(detailFetch).toContain('name=default')
+  expect(detailFetch).toContain('namespace=team-a')
 })
 
 test('list-renders-limit-ranges', async () => {

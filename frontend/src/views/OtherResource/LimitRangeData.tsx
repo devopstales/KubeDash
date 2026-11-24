@@ -33,15 +33,14 @@ type LimitPair = { cpu?: string; memory?: string } | undefined
 /**
  * 4.1 `other-resources/limit_range-data.html.j2` parity: one LimitRange's
  * metadata, the Container Limits table, and the full object as a
- * syntax-highlighted block. The read is a SINGLE `?name=` fetch (not 4.1's
- * list-then-filter); the kind is namespaced, so the namespace resolves
- * `?namespace=` → store → `default` (the SecretData pattern) and the URL
- * carries it. Empty `items` is a not-found STATE (pinned copy), not an
- * error. The list view's name links are the sole producer of these query
- * strings. The limits table iterates `spec.limits[]` by each entry's `type`
- * field (4.1 hardcoded cpu+memory rows; the rendered output for standard
- * LimitRanges is identical) and renders absent fields as `None` (4.1's
- * pinned copy).
+ * syntax-highlighted block. The read is a SINGLE `?name=&namespace=` fetch
+ * (4.1's list-then-filter is dropped; the list view's name links are the
+ * sole producer of these query strings). The kind is namespaced (core,
+ * snake_case to_dict). Empty `items` is a not-found STATE (pinned copy),
+ * not an error. The limits table iterates `spec.limits[]` by each entry's
+ * `type` field (4.1 hardcoded cpu+memory rows; the rendered output for
+ * standard LimitRanges is identical) and renders absent fields as `None`
+ * (4.1's pinned copy).
  */
 // ADR-0040: identity arrives as props from ObjectRoute (the active ref),
 // never from useSearchParams — the URL stays clean (R1). The namespace is

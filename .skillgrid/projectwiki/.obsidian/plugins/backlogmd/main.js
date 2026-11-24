@@ -3308,10 +3308,10 @@ var require_stringify = __commonJS({
       data = Object.assign({}, file.data, data);
       const open = opts.delimiters[0];
       const close = opts.delimiters[1];
-      const matter2 = engine.stringify(data, options2).trim();
+      const matter3 = engine.stringify(data, options2).trim();
       let buf = "";
-      if (matter2 !== "{}") {
-        buf = newline(open) + newline(matter2) + newline(close);
+      if (matter3 !== "{}") {
+        buf = newline(open) + newline(matter3) + newline(close);
       }
       if (typeof file.excerpt === "string" && file.excerpt !== "") {
         if (str3.indexOf(file.excerpt.trim()) === -1) {
@@ -3408,7 +3408,7 @@ var require_parse = __commonJS({
 var require_gray_matter = __commonJS({
   "node_modules/gray-matter/index.js"(exports2, module2) {
     "use strict";
-    var fs = require("fs");
+    var fs2 = require("fs");
     var sections = require_section_matter();
     var defaults = require_defaults();
     var stringify = require_stringify();
@@ -3417,19 +3417,19 @@ var require_gray_matter = __commonJS({
     var toFile = require_to_file();
     var parse2 = require_parse();
     var utils = require_utils();
-    function matter2(input, options2) {
+    function matter3(input, options2) {
       if (input === "") {
         return { data: {}, content: input, excerpt: "", orig: input };
       }
       let file = toFile(input);
-      const cached = matter2.cache[file.content];
+      const cached = matter3.cache[file.content];
       if (!options2) {
         if (cached) {
           file = Object.assign({}, cached);
           file.orig = cached.orig;
           return file;
         }
-        matter2.cache[file.content] = file;
+        matter3.cache[file.content] = file;
       }
       return parseMatter(file, options2);
     }
@@ -3451,7 +3451,7 @@ var require_gray_matter = __commonJS({
       }
       str3 = str3.slice(openLen);
       const len = str3.length;
-      const language = matter2.language(str3, opts);
+      const language = matter3.language(str3, opts);
       if (language.name) {
         file.language = language.name;
         str3 = str3.slice(language.raw.length);
@@ -3486,24 +3486,24 @@ var require_gray_matter = __commonJS({
       }
       return file;
     }
-    matter2.engines = engines2;
-    matter2.stringify = function(file, data, options2) {
-      if (typeof file === "string") file = matter2(file, options2);
+    matter3.engines = engines2;
+    matter3.stringify = function(file, data, options2) {
+      if (typeof file === "string") file = matter3(file, options2);
       return stringify(file, data, options2);
     };
-    matter2.read = function(filepath, options2) {
-      const str3 = fs.readFileSync(filepath, "utf8");
-      const file = matter2(str3, options2);
+    matter3.read = function(filepath, options2) {
+      const str3 = fs2.readFileSync(filepath, "utf8");
+      const file = matter3(str3, options2);
       file.path = filepath;
       return file;
     };
-    matter2.test = function(str3, options2) {
+    matter3.test = function(str3, options2) {
       return utils.startsWith(str3, defaults(options2).delimiters[0]);
     };
-    matter2.language = function(str3, options2) {
+    matter3.language = function(str3, options2) {
       const opts = defaults(options2);
       const open = opts.delimiters[0];
-      if (matter2.test(str3)) {
+      if (matter3.test(str3)) {
         str3 = str3.slice(open.length);
       }
       const language = str3.slice(0, str3.search(/\r?\n/));
@@ -3512,11 +3512,11 @@ var require_gray_matter = __commonJS({
         name: language ? language.trim() : ""
       };
     };
-    matter2.cache = {};
-    matter2.clearCache = function() {
-      matter2.cache = {};
+    matter3.cache = {};
+    matter3.clearCache = function() {
+      matter3.cache = {};
     };
-    module2.exports = matter2;
+    module2.exports = matter3;
   }
 });
 
@@ -3526,51 +3526,10 @@ __export(main_exports, {
   default: () => BacklogMdPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian8 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 
 // src/infrastructure/obsidian-fs.ts
 var import_obsidian = require("obsidian");
-var ObsidianFileSystem = class {
-  constructor(app) {
-    this.app = app;
-  }
-  normalize(p) {
-    return p.replace(/^\/+/, "");
-  }
-  async exists(path) {
-    return this.app.vault.adapter.exists(this.normalize(path));
-  }
-  async readText(path) {
-    return this.app.vault.adapter.read(this.normalize(path));
-  }
-  async writeText(path, content) {
-    const p = this.normalize(path);
-    if (await this.app.vault.adapter.exists(p)) {
-      await this.app.vault.adapter.write(p, content);
-    } else {
-      await this.app.vault.adapter.write(p, content);
-    }
-  }
-  async listDirs(path) {
-    const p = this.normalize(path);
-    const folder = this.app.vault.getAbstractFileByPath(p);
-    if (folder instanceof import_obsidian.TFolder) {
-      return folder.children.filter((c) => c instanceof import_obsidian.TFolder).map((c) => c.name);
-    }
-    return [];
-  }
-  async listFiles(path) {
-    const p = this.normalize(path);
-    const folder = this.app.vault.getAbstractFileByPath(p);
-    if (folder instanceof import_obsidian.TFolder) {
-      return folder.children.filter((c) => c instanceof import_obsidian.TFile).map((c) => c.name);
-    }
-    return [];
-  }
-  getVaultRoot() {
-    return "";
-  }
-};
 
 // node_modules/js-yaml/dist/js-yaml.mjs
 function getDefaultExportFromCjs(x) {
@@ -6639,13 +6598,26 @@ var {
 } = yaml2;
 
 // src/infrastructure/config.ts
+var import_path = __toESM(require("path"));
 var DEFAULT_BACKLOG_DIR = ".backlog";
-async function loadProjectConfig(fs, rootPath) {
+var DEFAULT_STATUSES = ["To Do", "In Progress", "Done"];
+var DEFAULT_DONE_STATUSES = ["Done", "done"];
+function walkUpForFile(startDir, fileName, maxDepth, exists) {
+  let dir = startDir;
+  for (let i = 0; i <= maxDepth; i++) {
+    if (exists(import_path.default.join(dir, fileName))) return dir;
+    const parent = import_path.default.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+async function loadProjectConfig(fs2, rootPath) {
   const advPath = `${rootPath}/backlog.config.yml`;
   let backlogDir = DEFAULT_BACKLOG_DIR;
   let adv = {};
-  if (await fs.exists(advPath)) {
-    const text = await fs.readText(advPath);
+  if (await fs2.exists(advPath)) {
+    const text = await fs2.readText(advPath);
     adv = yaml2.load(text) ?? {};
     if (adv.backlog_directory) backlogDir = adv.backlog_directory;
   }
@@ -6653,55 +6625,150 @@ async function loadProjectConfig(fs, rootPath) {
   let legacy = {};
   const candidates = [configPath, `${rootPath}/${backlogDir}/config.yaml`];
   for (const c of candidates) {
-    if (await fs.exists(c)) {
-      const text = await fs.readText(c);
+    if (await fs2.exists(c)) {
+      const text = await fs2.readText(c);
       legacy = yaml2.load(text) ?? {};
       break;
     }
   }
-  const hasAny = await fs.exists(advPath) || await fs.exists(`${rootPath}/${backlogDir}/config.yml`) || await fs.exists(`${rootPath}/${backlogDir}/config.yaml`);
+  const hasAny = await fs2.exists(advPath) || await fs2.exists(`${rootPath}/${backlogDir}/config.yml`) || await fs2.exists(`${rootPath}/${backlogDir}/config.yaml`);
   if (!hasAny) return null;
-  const statuses = legacy.statuses ?? adv.statuses ?? ["To Do", "In Progress", "Done"];
-  const doneStatuses = legacy.done_statuses ?? ["Done"];
+  const statuses = legacy.statuses ?? adv.statuses ?? DEFAULT_STATUSES;
+  const doneStatuses = legacy.done_statuses ?? adv.done_statuses ?? DEFAULT_DONE_STATUSES;
+  const base = rootPath ? `${rootPath}/${backlogDir}` : backlogDir;
   return {
     name: adv.project_name ?? legacy.project_name ?? rootPath.split("/").pop() ?? "project",
     rootPath,
     backlogDirectory: backlogDir,
+    vaultBacklogDir: base,
     statuses,
-    types: legacy.types ?? [],
-    priorities: legacy.priorities ?? [],
+    types: legacy.types ?? adv.types ?? [],
+    priorities: legacy.priorities ?? adv.priorities ?? [],
     doneStatuses,
     taskPrefix: legacy.task_prefix ?? adv.task_prefix ?? "task"
   };
 }
-async function discoverProjects(fs, scanRoots, manualRoots) {
+async function loadAncestorProjectConfig(fs2, rootAbs, vaultRel) {
+  const adv = yaml2.load(await fs2.readTextAbs(import_path.default.join(rootAbs, "backlog.config.yml"))) ?? {};
+  const backlogDir = adv.backlog_directory ?? DEFAULT_BACKLOG_DIR;
+  if (vaultRel && !backlogDir.startsWith(`${vaultRel}/`)) return null;
+  const inVault = vaultRel ? backlogDir.slice(vaultRel.length + 1) : backlogDir;
+  if (!await fs2.exists(inVault)) return null;
+  return {
+    name: adv.project_name ?? (import_path.default.basename(rootAbs) || "project"),
+    rootPath: "",
+    backlogDirectory: backlogDir,
+    vaultBacklogDir: inVault,
+    statuses: adv.statuses ?? DEFAULT_STATUSES,
+    types: adv.types ?? [],
+    priorities: adv.priorities ?? [],
+    doneStatuses: adv.done_statuses ?? DEFAULT_DONE_STATUSES,
+    taskPrefix: adv.task_prefix ?? "task"
+  };
+}
+async function discoverProjects(fs2, scanRoots, manualRoots) {
   const results = [];
   const seen = /* @__PURE__ */ new Set();
-  const tryRoot = async (root) => {
-    const cfg = await loadProjectConfig(fs, root);
-    if (cfg && !seen.has(cfg.rootPath)) {
-      seen.add(cfg.rootPath);
+  const add = (cfg) => {
+    if (cfg && !seen.has(`${cfg.rootPath}::${cfg.vaultBacklogDir}`)) {
+      seen.add(`${cfg.rootPath}::${cfg.vaultBacklogDir}`);
       results.push(cfg);
     }
   };
-  for (const root of manualRoots) await tryRoot(root);
+  const tryRoot = async (root) => {
+    add(await loadProjectConfig(fs2, root));
+  };
+  try {
+    const rootAbs = await fs2.findAncestorProjectRoot();
+    if (rootAbs) {
+      const vaultAbs = await fs2.getVaultRootAbs();
+      const vaultRel = import_path.default.relative(rootAbs, vaultAbs).split(import_path.default.sep).join("/");
+      add(await loadAncestorProjectConfig(fs2, rootAbs, vaultRel));
+    }
+  } catch {
+  }
+  for (const root of manualRoots) await tryRoot(root.replace(/^\/+/, ""));
   for (const scanRoot of scanRoots) {
     let dirs = [];
     try {
-      dirs = await fs.listDirs(scanRoot);
+      dirs = await fs2.listDirs(scanRoot);
     } catch {
       continue;
     }
     for (const d of dirs) {
-      await tryRoot(`${scanRoot}/${d}`);
+      await tryRoot(`${scanRoot}/${d}`.replace(/^\/+/, ""));
     }
   }
   return results;
 }
 
+// src/infrastructure/obsidian-fs.ts
+var import_fs = __toESM(require("fs"));
+var ObsidianFileSystem = class {
+  constructor(app) {
+    this.app = app;
+  }
+  normalize(p) {
+    return p.replace(/^\/+/, "");
+  }
+  async exists(path2) {
+    return this.app.vault.adapter.exists(this.normalize(path2));
+  }
+  async readText(path2) {
+    return this.app.vault.adapter.read(this.normalize(path2));
+  }
+  async writeText(path2, content) {
+    const p = this.normalize(path2);
+    if (await this.app.vault.adapter.exists(p)) {
+      await this.app.vault.adapter.write(p, content);
+    } else {
+      await this.app.vault.adapter.write(p, content);
+    }
+  }
+  async listDirs(path2) {
+    const p = this.normalize(path2);
+    const folder = this.app.vault.getAbstractFileByPath(p);
+    if (folder instanceof import_obsidian.TFolder) {
+      return folder.children.filter((c) => c instanceof import_obsidian.TFolder).map((c) => c.name);
+    }
+    return [];
+  }
+  async listFiles(path2) {
+    const p = this.normalize(path2);
+    const folder = this.app.vault.getAbstractFileByPath(p);
+    if (folder instanceof import_obsidian.TFolder) {
+      return folder.children.filter((c) => c instanceof import_obsidian.TFile).map((c) => c.name);
+    }
+    return [];
+  }
+  getVaultRoot() {
+    return "";
+  }
+  // Desktop only: FileSystemAdapter exposes getBasePath; the mobile adapter
+  // does not (methods that need it throw/return null, discovery falls back
+  // to in-vault roots).
+  basePath() {
+    const a = this.app.vault.adapter;
+    return typeof a.getBasePath === "function" ? a.getBasePath() : null;
+  }
+  async getVaultRootAbs() {
+    const b = this.basePath();
+    if (b === null) throw new Error("adapter has no getBasePath");
+    return b;
+  }
+  async findAncestorProjectRoot(maxDepth = 5) {
+    const b = this.basePath();
+    if (b === null) return null;
+    return walkUpForFile(b, "backlog.config.yml", maxDepth, (p) => import_fs.default.existsSync(p));
+  }
+  async readTextAbs(absPath) {
+    return import_fs.default.promises.readFile(absPath, "utf8");
+  }
+};
+
 // src/infrastructure/vault.ts
 var import_gray_matter = __toESM(require_gray_matter());
-function parseTask(path, content) {
+function parseTask(path2, content) {
   const parsed = (0, import_gray_matter.default)(content);
   const data = parsed.data;
   const task = {
@@ -6720,14 +6787,15 @@ function parseTask(path, content) {
     references: data.references,
     documentation: data.documentation,
     parent_task_id: data.parent_task_id,
+    ordinal: typeof data.ordinal === "number" ? data.ordinal : void 0,
     body: parsed.content,
-    path
+    path: path2
   };
   return { task, body: parsed.content, raw: content };
 }
 function serializeTask(task, body) {
   const data = {};
-  const order = ["id", "title", "status", "type", "priority", "labels", "assignee", "milestone", "sprint", "created_date", "updated_date", "dependencies", "references", "documentation", "parent_task_id"];
+  const order = ["id", "title", "status", "type", "priority", "labels", "assignee", "milestone", "sprint", "created_date", "updated_date", "dependencies", "references", "documentation", "parent_task_id", "ordinal"];
   for (const k of order) {
     const v = task[k];
     if (v !== void 0) data[k] = v;
@@ -6737,11 +6805,11 @@ function serializeTask(task, body) {
 
 // src/infrastructure/task-repository.ts
 var FileTaskRepository = class {
-  constructor(fs) {
-    this.fs = fs;
+  constructor(fs2) {
+    this.fs = fs2;
   }
   tasksDir(project) {
-    return `${project.rootPath}/${project.backlogDirectory}/tasks`;
+    return `${project.vaultBacklogDir}/tasks`;
   }
   async list(project) {
     const dir = this.tasksDir(project);
@@ -6770,7 +6838,10 @@ var FileTaskRepository = class {
   }
   async create(project, task, body) {
     const dir = this.tasksDir(project);
-    const filePath = `${dir}/${task.id}.md`;
+    const num = task.id.replace(/[^0-9]/g, "");
+    const slug = task.title.trim().replace(/[^\p{L}\p{N}.-]+/gu, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    const base = `${project.taskPrefix}-${num.padStart(3, "0")}`;
+    const filePath = slug ? `${dir}/${base} - ${slug}.md` : `${dir}/${base}.md`;
     const t = { ...task, path: filePath };
     const content = serializeTask(t, body);
     await this.fs.writeText(filePath, content);
@@ -6778,30 +6849,117 @@ var FileTaskRepository = class {
   }
 };
 
+// src/domain/milestone.ts
+var import_gray_matter2 = __toESM(require_gray_matter());
+function parseMilestone(path2, content) {
+  const parsed = (0, import_gray_matter2.default)(content);
+  const data = parsed.data;
+  const milestone = {
+    id: String(data.id ?? ""),
+    title: String(data.title ?? ""),
+    state: data.state,
+    start_date: data.start_date,
+    end_date: data.end_date,
+    goal: data.goal,
+    completed_tasks: data.completed_tasks,
+    carried_over_tasks: data.carried_over_tasks,
+    body: parsed.content,
+    path: path2
+  };
+  return { milestone, body: parsed.content };
+}
+function serializeMilestone(m, body) {
+  const data = {};
+  const order = ["id", "title", "state", "start_date", "end_date", "goal", "completed_tasks", "carried_over_tasks"];
+  for (const k of order) {
+    const v = m[k];
+    if (v !== void 0) data[k] = v;
+  }
+  return import_gray_matter2.default.stringify(body, data);
+}
+function effectiveState(m, tasks, doneStatuses) {
+  if (m.state) return m.state;
+  const msTasks = tasks.filter((t) => t.milestone === m.id);
+  if (msTasks.length > 0 && msTasks.every((t) => doneStatuses.includes(t.status))) return "completed";
+  return "planned";
+}
+function daysLeft(m) {
+  if (!m.end_date) return null;
+  const [y, mo, d] = m.end_date.split("-").map(Number);
+  if (!y || !mo || !d) return null;
+  const end = Date.UTC(y, mo - 1, d);
+  const now = /* @__PURE__ */ new Date();
+  const today2 = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((end - today2) / 864e5);
+}
+function today() {
+  return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+}
+
+// src/infrastructure/milestone-repository.ts
+var FileMilestoneRepository = class {
+  constructor(fs2) {
+    this.fs = fs2;
+  }
+  dir(project) {
+    return `${project.vaultBacklogDir}/milestones`;
+  }
+  async list(project) {
+    const dir = this.dir(project);
+    let files = [];
+    try {
+      files = await this.fs.listFiles(dir);
+    } catch {
+      return [];
+    }
+    const out = [];
+    for (const f of files.filter((x) => x.endsWith(".md"))) {
+      const content = await this.fs.readText(`${dir}/${f}`);
+      out.push(parseMilestone(`${dir}/${f}`, content).milestone);
+    }
+    return out;
+  }
+  async write(project, m, body) {
+    const filePath = m.path || `${this.dir(project)}/${m.id}.md`;
+    await this.fs.writeText(filePath, serializeMilestone({ ...m, path: filePath }, body));
+  }
+  async create(project, m, body) {
+    const dir = this.dir(project);
+    const slug = m.title.trim().replace(/[^\p{L}\p{N}.-]+/gu, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    const filePath = slug ? `${dir}/${m.id} - ${slug}.md` : `${dir}/${m.id}.md`;
+    await this.fs.writeText(filePath, serializeMilestone({ ...m, path: filePath }, body));
+    return filePath;
+  }
+};
+
 // src/compose.ts
 function compose(plugin) {
-  const fs = new ObsidianFileSystem(plugin.app);
-  const repo = new FileTaskRepository(fs);
+  const fs2 = new ObsidianFileSystem(plugin.app);
+  const repo = new FileTaskRepository(fs2);
+  const milestones = new FileMilestoneRepository(fs2);
   const ctx = {
-    fs,
+    fs: fs2,
     repo,
+    milestones,
     projects: [],
-    async start() {
-      const root = "/";
+    async start(manualRoots) {
       const roots = [];
       const vault = plugin.app.vault;
       const rootFolder = vault.getRoot();
       for (const c of rootFolder.children) {
         if (c.children !== void 0) roots.push(c.path || c.name);
       }
-      ctx.projects = await discoverProjects(fs, ["/"], roots);
+      for (const r of manualRoots) {
+        if (!roots.includes(r)) roots.push(r);
+      }
+      ctx.projects = await discoverProjects(fs2, ["/"], roots);
     }
   };
   return ctx;
 }
 
 // src/ui/kanban-view.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // src/domain/task.ts
 function isBlocked(task, tasksById, doneStatuses) {
@@ -6814,16 +6972,200 @@ function isBlocked(task, tasksById, doneStatuses) {
 }
 
 // src/application/move-task.ts
-async function moveTask(repo, project, task, newStatus) {
-  const updated = { ...task, status: newStatus, updated_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) };
+async function moveTask(repo, project, task, newStatus, ordinal) {
+  const updated = { ...task, status: newStatus, ordinal, updated_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) };
   await repo.write(project, updated, task.body ?? "");
 }
+async function reorderColumn(repo, project, ordered) {
+  for (let i = 0; i < ordered.length; i++) {
+    const updated = { ...ordered[i], ordinal: i * 1e3 + 1e3 };
+    await repo.write(project, updated, ordered[i].body ?? "");
+  }
+}
+
+// src/ui/project-switcher.ts
+function renderProjectSwitcher(container, projects, selected, onChange) {
+  const sel = container.createEl("select", { cls: "backlogmd-project-switcher" });
+  projects.forEach((p, i) => {
+    const opt = sel.createEl("option", { text: p.name, value: String(i) });
+    if (i === selected) opt.selected = true;
+  });
+  sel.addEventListener("change", () => onChange(Number(sel.value)));
+}
+
+// src/ui/task-modal.ts
+var import_obsidian2 = require("obsidian");
+
+// src/application/create-task.ts
+function nextTaskId(existing, prefix) {
+  let max = 0;
+  for (const t of existing) {
+    const m = t.id.match(/(\d+)\s*$/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${prefix.toUpperCase()}-${String(max + 1).padStart(3, "0")}`;
+}
+async function createTask(repo, project, input, existing) {
+  const id = nextTaskId(existing, project.taskPrefix);
+  const ordinal = existing.length ? Math.max(...existing.map((t) => t.ordinal ?? 0)) + 1e3 : 1e3;
+  const task = {
+    id,
+    title: input.summary,
+    status: input.status ?? project.statuses[0] ?? "To Do",
+    type: input.type || void 0,
+    priority: input.priority || void 0,
+    assignee: input.assignee?.length ? input.assignee : void 0,
+    milestone: input.milestone || void 0,
+    dependencies: input.dependencies?.length ? input.dependencies : void 0,
+    ordinal,
+    path: ""
+  };
+  return repo.create(project, task, input.body ?? "");
+}
+
+// src/application/edit-task.ts
+async function editTask(repo, project, task, patch, body) {
+  const updated = { ...task, ...patch, updated_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) };
+  await repo.write(project, updated, body ?? task.body ?? "");
+}
+
+// src/ui/task-modal.ts
+function listValue(values) {
+  return (values ?? []).join(", ");
+}
+function parseList(value) {
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
+var TaskModal = class extends import_obsidian2.Modal {
+  ctx;
+  project;
+  task;
+  allTasks;
+  summary = "";
+  body = "";
+  type = "";
+  priority = "";
+  status = "";
+  assignee = "";
+  milestone = "";
+  dependencies = "";
+  constructor(app, ctx, project, task, allTasks, defaultMilestone) {
+    super(app);
+    this.ctx = ctx;
+    this.project = project;
+    this.task = task;
+    this.allTasks = allTasks;
+    if (task) {
+      this.summary = task.title;
+      this.body = task.body ?? "";
+      this.type = task.type ?? "";
+      this.priority = task.priority ?? "";
+      this.status = task.status;
+      this.assignee = listValue(task.assignee);
+      this.milestone = task.milestone ?? "";
+      this.dependencies = listValue(task.dependencies);
+    } else {
+      this.status = project.statuses[0] ?? "To Do";
+      this.milestone = defaultMilestone ?? "";
+    }
+  }
+  addDatalist(input, id, options2) {
+    const list = this.contentEl.createEl("datalist");
+    list.id = id;
+    for (const o of options2) list.createEl("option", { value: o });
+    input.setAttribute("list", id);
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: this.task ? `Edit ${this.task.id}` : "Create task" });
+    new import_obsidian2.Setting(contentEl).setName("Summary").setDesc("Required").addText((t) => {
+      t.setPlaceholder("Task title").setValue(this.summary).onChange((v) => this.summary = v);
+    });
+    new import_obsidian2.Setting(contentEl).setName("Description").setDesc("Markdown, saved as the task body").addTextArea((t) => {
+      t.setPlaceholder("What needs to happen?").setValue(this.body).onChange((v) => this.body = v);
+      t.inputEl.rows = 6;
+    });
+    new import_obsidian2.Setting(contentEl).setName("Type").addDropdown((d) => {
+      d.addOption("", "");
+      for (const ty of this.project.types) d.addOption(ty, ty);
+      d.setValue(this.type).onChange((v) => this.type = v);
+    });
+    new import_obsidian2.Setting(contentEl).setName("Priority").addDropdown((d) => {
+      d.addOption("", "");
+      for (const p of this.project.priorities) d.addOption(p, p);
+      d.setValue(this.priority).onChange((v) => this.priority = v);
+    });
+    new import_obsidian2.Setting(contentEl).setName("Status").addDropdown((d) => {
+      for (const s of this.project.statuses) d.addOption(s, s);
+      d.setValue(this.status).onChange((v) => this.status = v);
+    });
+    new import_obsidian2.Setting(contentEl).setName("Assignee").setDesc("Comma-separated").addText((t) => {
+      t.setPlaceholder("@user, @user2").setValue(this.assignee).onChange((v) => this.assignee = v);
+    });
+    new import_obsidian2.Setting(contentEl).setName("Milestone").addText((t) => {
+      t.setPlaceholder("m-0").setValue(this.milestone).onChange((v) => this.milestone = v);
+    });
+    new import_obsidian2.Setting(contentEl).setName("Dependencies").setDesc("Comma-separated task IDs that must be done first \u2014 unfinished ones flag this task as blocked").addTextArea((t) => {
+      t.setPlaceholder("TASK-001, TASK-002").setValue(this.dependencies).onChange((v) => this.dependencies = v);
+      t.inputEl.rows = 2;
+      this.addDatalist(t.inputEl, "backlogmd-task-ids", this.allTasks.map((x) => x.id));
+    });
+    new import_obsidian2.Setting(contentEl).addButton((b) => {
+      b.setButtonText(this.task ? "Save" : "Create");
+      b.setCta();
+      b.onClick(async () => {
+        if (!this.summary.trim()) return;
+        const patch = {
+          title: this.summary.trim(),
+          type: this.type || void 0,
+          priority: this.priority || void 0,
+          status: this.status,
+          assignee: parseList(this.assignee),
+          milestone: this.milestone.trim() || void 0,
+          dependencies: parseList(this.dependencies)
+        };
+        if (this.task) {
+          await editTask(this.ctx.repo, this.project, this.task, patch, this.body);
+        } else {
+          const input = {
+            summary: this.summary.trim(),
+            body: this.body,
+            type: this.type || void 0,
+            priority: this.priority || void 0,
+            status: this.status,
+            assignee: parseList(this.assignee),
+            milestone: this.milestone.trim() || void 0,
+            dependencies: parseList(this.dependencies)
+          };
+          await createTask(this.ctx.repo, this.project, input, this.allTasks);
+        }
+        this.close();
+      });
+    });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
 
 // src/ui/kanban-view.ts
 var KANBAN_VIEW_TYPE = "backlogmd-kanban";
-var KanbanView = class extends import_obsidian2.ItemView {
+var byOrdinal = (a, b) => (a.ordinal ?? Number.MAX_SAFE_INTEGER) - (b.ordinal ?? Number.MAX_SAFE_INTEGER) || (a.created_date ?? "").localeCompare(b.created_date ?? "") || a.id.localeCompare(b.id);
+var KanbanView = class extends import_obsidian3.ItemView {
   ctx;
   projectIndex = 0;
+  filter = "";
+  /** null = auto (active milestone if any, else all); a string = the user's
+   * explicit dropdown pick ("" = All tasks). */
+  boardMilestone = null;
+  /** Resolved board selection after the last render (active fallback when
+   * the board shows All); the new-task modal defaults to it. */
+  selectedMilestoneId = null;
+  boardEl = null;
+  boardHeaderEl = null;
+  milestoneSelectEl = null;
+  indicatorEl = null;
+  renderSeq = 0;
   constructor(leaf, ctx) {
     super(leaf);
     this.ctx = ctx;
@@ -6837,60 +7179,339 @@ var KanbanView = class extends import_obsidian2.ItemView {
   async onOpen() {
     await this.render();
   }
+  async onClose() {
+    this.removeIndicator();
+  }
   async render() {
+    try {
+      await this.renderInner();
+    } catch (e) {
+      console.error("[backlogmd] kanban render failed:", e.stack ?? String(e));
+      throw e;
+    }
+  }
+  renderBoardHeader(project, selected, boardTasks) {
+    const header = this.boardHeaderEl;
+    if (!header) return;
+    header.empty();
+    if (selected) {
+      const state = effectiveState(selected, boardTasks, project.doneStatuses);
+      header.createEl("span", { text: state, cls: `backlogmd-chip${state === "active" ? " backlogmd-chip-active" : ""}` });
+      header.createEl("span", { text: `${selected.id} ${selected.title}`, cls: "backlogmd-section-title" });
+      const bits = [];
+      if (selected.end_date) {
+        const dl = daysLeft(selected);
+        if (dl !== null) bits.push(dl >= 0 ? `ends ${selected.end_date} \xB7 ${dl}d left` : `overdue by ${-dl}d`);
+      }
+      const done = boardTasks.filter((t) => project.doneStatuses.includes(t.status)).length;
+      bits.push(`${done}/${boardTasks.length} done`);
+      header.createEl("span", { text: bits.join(" \xB7 "), cls: "backlogmd-section-meta" });
+    } else {
+      header.createEl("span", { text: "All tasks", cls: "backlogmd-section-title" });
+      header.createEl("span", { text: `${boardTasks.length} tasks`, cls: "backlogmd-section-meta" });
+    }
+  }
+  populateMilestoneSelect(milestones, value) {
+    const sel = this.milestoneSelectEl;
+    if (!sel) return;
+    sel.empty();
+    sel.createEl("option", { value: "", text: "All tasks" });
+    for (const m of [...milestones].sort((a, b) => a.id.localeCompare(b.id, void 0, { numeric: true }))) {
+      sel.createEl("option", { value: m.id, text: `${m.id} \xB7 ${m.title}` });
+    }
+    sel.value = value;
+  }
+  async renderInner() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("backlogmd-board");
+    this.boardEl = null;
+    this.milestoneSelectEl = null;
     const project = this.ctx.projects[this.projectIndex];
     if (!project) {
       container.createEl("div", { text: "No backlog project found.", cls: "backlogmd-empty" });
       return;
     }
+    const toolbar = container.createDiv({ cls: "backlogmd-toolbar" });
+    renderProjectSwitcher(toolbar, this.ctx.projects, this.projectIndex, (i) => {
+      this.projectIndex = i;
+      this.boardMilestone = null;
+      void this.render();
+    });
+    const milestoneSel = toolbar.createEl("select", { cls: "backlogmd-milestone-select" });
+    this.milestoneSelectEl = milestoneSel;
+    milestoneSel.addEventListener("change", () => {
+      this.boardMilestone = milestoneSel.value;
+      void this.renderBoard(project);
+    });
+    const filter = toolbar.createEl("input", { type: "text", cls: "backlogmd-filter", placeholder: "Filter by id, title, type, assignee, label" });
+    filter.value = this.filter;
+    filter.addEventListener("input", () => {
+      this.filter = filter.value;
+      void this.renderBoard(project);
+    });
+    const newBtn = toolbar.createEl("button", { text: "+ New task", cls: "backlogmd-new-task" });
+    newBtn.addEventListener("click", () => this.openModal(project, null));
+    this.boardHeaderEl = container.createDiv({ cls: "backlogmd-board-header" });
+    this.boardEl = container.createDiv({ cls: "backlogmd-board" });
+    await this.renderBoard(project);
+  }
+  async renderBoard(project) {
+    const seq2 = ++this.renderSeq;
+    const board = this.boardEl;
+    if (!board) return;
+    board.empty();
+    this.removeIndicator();
     const repo = this.ctx.repo;
     const tasks = await repo.list(project);
+    const milestones = await this.ctx.milestones.list(project);
+    if (seq2 !== this.renderSeq) return;
+    const active = milestones.find((m) => m.state === "active") ?? null;
+    let sel = this.boardMilestone;
+    if (sel === null) sel = active ? active.id : "";
+    if (sel && !milestones.some((m) => m.id === sel)) sel = "";
+    const selected = sel ? milestones.find((m) => m.id === sel) ?? null : null;
+    this.selectedMilestoneId = selected ? selected.id : active ? active.id : null;
+    this.populateMilestoneSelect(milestones, selected ? selected.id : "");
+    const boardTasks = selected ? tasks.filter((t) => t.milestone === selected.id) : tasks;
+    this.renderBoardHeader(project, selected, boardTasks);
     const byId = new Map(tasks.map((t) => [t.id, t]));
-    const doneStatuses = project.doneStatuses;
+    const q = this.filter.trim().toLowerCase();
+    const matches = (t) => !q || t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || (t.type ?? "").toLowerCase().includes(q) || (t.assignee ?? []).join(" ").toLowerCase().includes(q) || (t.labels ?? []).join(" ").toLowerCase().includes(q) || (t.milestone ?? "").toLowerCase().includes(q);
     for (const status of project.statuses) {
-      const col = container.createDiv({ cls: "backlogmd-column" });
-      col.createEl("h3", { text: status });
-      const cards = tasks.filter((t) => t.status === status);
-      for (const task of cards) {
-        const card = col.createDiv({ cls: "backlogmd-card" });
-        if (isBlocked(task, byId, doneStatuses)) card.addClass("blocked");
-        card.createEl("div", { text: task.title });
-        card.createEl("small", { text: task.id });
-        if (isBlocked(task, byId, doneStatuses)) card.createEl("span", { text: " \u26A0" });
-        card.setAttribute("draggable", "true");
-        card.addEventListener("dragstart", (e) => {
-          e.dataTransfer?.setData("text/plain", task.id);
-        });
-        card.addEventListener("click", (e) => {
-          if (e.metaKey || e.ctrlKey) {
-            const file = this.app.vault.getAbstractFileByPath(task.path);
-            if (file instanceof import_obsidian2.TFile) this.app.workspace.getLeaf(true).openFile(file);
-          }
-        });
-        col.addEventListener("dragover", (e) => e.preventDefault());
-        col.addEventListener("drop", async (e) => {
-          e.preventDefault();
-          const id = e.dataTransfer?.getData("text/plain");
-          if (!id) return;
-          const t = tasks.find((x) => x.id === id);
-          if (!t || t.status === status) return;
-          await moveTask(repo, project, t, status);
-          await this.render();
-        });
+      const allInCol = boardTasks.filter((t) => t.status === status).sort(byOrdinal);
+      const visible = allInCol.filter(matches);
+      const col = board.createDiv({ cls: "backlogmd-column" });
+      const header = col.createDiv({ cls: "backlogmd-column-header" });
+      header.createEl("h3", { text: status, cls: "backlogmd-column-title" });
+      header.createEl("span", { text: String(visible.length), cls: "backlogmd-count" });
+      const listEl = col.createDiv({ cls: "backlogmd-cards" });
+      for (const task of visible) {
+        listEl.appendChild(this.renderCard(project, task, byId));
       }
+      listEl.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        this.showIndicator(listEl, e.clientY, e.dataTransfer?.getData("text/plain") ?? null);
+      });
+      listEl.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        this.removeIndicator();
+        const id = e.dataTransfer?.getData("text/plain");
+        if (!id) return;
+        await this.handleDrop(repo, project, allInCol, status, id, e.clientY, listEl);
+      });
     }
+  }
+  renderCard(project, task, byId) {
+    const card = createEl("div", { cls: "backlogmd-card" });
+    card.dataset.id = task.id;
+    const blocked = isBlocked(task, byId, project.doneStatuses);
+    if (blocked) card.addClass("blocked");
+    const top = card.createDiv({ cls: "backlogmd-card-top" });
+    top.createEl("span", { text: task.id, cls: "backlogmd-card-id" });
+    if (task.type) top.createEl("span", { text: task.type, cls: "backlogmd-badge" });
+    if (task.priority) top.createEl("span", { text: task.priority, cls: `backlogmd-badge backlogmd-p-${task.priority}` });
+    if (blocked) top.createEl("span", { text: "\u26D4", cls: "backlogmd-blocked", title: "Blocked by unfinished dependencies" });
+    card.createEl("div", { text: task.title, cls: "backlogmd-card-title" });
+    const meta = card.createDiv({ cls: "backlogmd-card-meta" });
+    if (task.milestone) meta.createEl("span", { text: task.milestone, cls: "backlogmd-milestone" });
+    if (task.assignee?.length) meta.createEl("span", { text: task.assignee.join(", "), cls: "backlogmd-assignee" });
+    if (task.labels?.length) meta.createEl("span", { text: task.labels.map((l) => `#${l}`).join(" "), cls: "backlogmd-labels" });
+    if (task.dependencies?.length) meta.createEl("span", { text: task.dependencies.join(", "), cls: "backlogmd-deps" });
+    card.setAttribute("draggable", "true");
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("text/plain", task.id);
+      card.addClass("dragging");
+    });
+    card.addEventListener("dragend", () => card.removeClass("dragging"));
+    card.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey) {
+        const file = this.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof import_obsidian3.TFile) this.app.workspace.getLeaf(true).openFile(file);
+      } else {
+        this.openModal(project, task);
+      }
+    });
+    return card;
+  }
+  openModal(project, task) {
+    void Promise.all([this.ctx.repo.list(project), this.ctx.milestones.list(project)]).then(([all]) => {
+      const modal = new TaskModal(this.app, this.ctx, project, task, all, this.selectedMilestoneId ?? void 0);
+      const origClose = modal.onClose.bind(modal);
+      modal.onClose = () => {
+        origClose();
+        void this.renderBoard(project);
+      };
+      modal.open();
+    });
+  }
+  /** Index where a card dropped at clientY would land, excluding the dragged card. */
+  dropIndex(listEl, clientY, draggedId) {
+    const cards = Array.from(listEl.querySelectorAll(".backlogmd-card")).filter((c) => c.dataset.id !== draggedId);
+    for (let i = 0; i < cards.length; i++) {
+      const r = cards[i].getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) return i;
+    }
+    return cards.length;
+  }
+  showIndicator(listEl, clientY, draggedId) {
+    this.removeIndicator();
+    const index = this.dropIndex(listEl, clientY, draggedId);
+    const line = createEl("div", { cls: "backlogmd-drop-line" });
+    this.indicatorEl = line;
+    const cards = Array.from(listEl.querySelectorAll(".backlogmd-card")).filter((c) => c.dataset.id !== draggedId);
+    if (index >= cards.length) listEl.appendChild(line);
+    else listEl.insertBefore(line, cards[index]);
+  }
+  removeIndicator() {
+    this.indicatorEl?.remove();
+    this.indicatorEl = null;
+  }
+  async handleDrop(repo, project, allInCol, status, id, clientY, listEl) {
+    const dragged = allInCol.find((t) => t.id === id) ?? (await repo.list(project)).find((t) => t.id === id);
+    if (!dragged) return;
+    if (dragged.status === status) {
+      if (this.filter.trim()) return;
+      const index = this.dropIndex(listEl, clientY, id);
+      const from = allInCol.findIndex((t) => t.id === id);
+      if (from === -1) return;
+      const ordered = [...allInCol];
+      ordered.splice(from, 1);
+      ordered.splice(index, 0, dragged);
+      if (ordered.every((t, i) => t === allInCol[i])) return;
+      await reorderColumn(repo, project, ordered);
+    } else {
+      const ordinal = allInCol.length ? Math.max(...allInCol.map((t) => t.ordinal ?? 0)) + 1e3 : 1e3;
+      await moveTask(repo, project, dragged, status, ordinal);
+    }
+    await this.renderBoard(project);
   }
 };
 
 // src/ui/backlog-view.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian5 = require("obsidian");
+
+// src/application/milestone.ts
+function nextMilestoneId(existing) {
+  let max = 0;
+  for (const m of existing) {
+    const n = parseInt(m.id.replace(/[^0-9]/g, ""), 10);
+    if (!Number.isNaN(n)) max = Math.max(max, n);
+  }
+  return `m-${max + 1}`;
+}
+async function startMilestone(tasks, milestones, project, ms) {
+  const all = await milestones.list(project);
+  const taskList = await tasks.list(project);
+  for (const other of all) {
+    if (other.id !== ms.id && other.state === "active") {
+      await completeMilestone(tasks, milestones, project, other, taskList);
+    }
+  }
+  const updated = { ...ms, state: "active", start_date: ms.start_date ?? today() };
+  await milestones.write(project, updated, ms.body ?? "");
+}
+async function completeMilestone(tasks, milestones, project, ms, taskList) {
+  const all = taskList ?? await tasks.list(project);
+  const done = new Set(project.doneStatuses);
+  const msTasks = all.filter((t) => t.milestone === ms.id);
+  const completedTasks = msTasks.filter((t) => done.has(t.status)).map((t) => t.id);
+  const carriedOver = msTasks.filter((t) => !done.has(t.status));
+  for (const t of carriedOver) {
+    const updated2 = { ...t, milestone: void 0, updated_date: today() };
+    await tasks.write(project, updated2, t.body ?? "");
+  }
+  const updated = {
+    ...ms,
+    state: "completed",
+    end_date: ms.end_date ?? today(),
+    completed_tasks: completedTasks,
+    carried_over_tasks: carriedOver.map((t) => t.id)
+  };
+  await milestones.write(project, updated, ms.body ?? "");
+}
+async function planTask(tasks, project, task, milestoneId, taskList) {
+  let ordinal = task.ordinal;
+  if (milestoneId) {
+    const all = taskList ?? await tasks.list(project);
+    const peers = all.filter((t) => t.milestone === milestoneId);
+    ordinal = (peers.length ? Math.max(...peers.map((p) => p.ordinal ?? 0)) : 0) + 1e3;
+  }
+  const updated = { ...task, milestone: milestoneId ?? void 0, ordinal, updated_date: today() };
+  await tasks.write(project, updated, task.body ?? "");
+}
+
+// src/ui/milestone-modal.ts
+var import_obsidian4 = require("obsidian");
+var MilestoneModal = class extends import_obsidian4.Modal {
+  constructor(app, ctx, project, existing) {
+    super(app);
+    this.ctx = ctx;
+    this.project = project;
+    this.existing = existing;
+  }
+  title = "";
+  goal = "";
+  endDate = "";
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "Create milestone (sprint)" });
+    new import_obsidian4.Setting(contentEl).setName("Title").setDesc("Required").addText((t) => {
+      t.setPlaceholder("e.g. 2026-11-20-auth-hardening").setValue(this.title).onChange((v) => this.title = v);
+    });
+    new import_obsidian4.Setting(contentEl).setName("Goal").setDesc("What this sprint is for").addTextArea((t) => {
+      t.setPlaceholder("One sentence").setValue(this.goal).onChange((v) => this.goal = v);
+      t.inputEl.rows = 2;
+    });
+    new import_obsidian4.Setting(contentEl).setName("End date").setDesc("yyyy-mm-dd, optional").addText((t) => {
+      t.setPlaceholder("2026-11-20").setValue(this.endDate).onChange((v) => this.endDate = v);
+    });
+    new import_obsidian4.Setting(contentEl).addButton((b) => {
+      b.setButtonText("Create");
+      b.setCta();
+      b.onClick(async () => {
+        if (!this.title.trim()) return;
+        const id = nextMilestoneId(this.existing);
+        const m = {
+          id,
+          title: this.title.trim(),
+          goal: this.goal.trim() || void 0,
+          end_date: this.endDate.trim() || void 0,
+          state: "planned",
+          path: ""
+        };
+        const body = `
+## Description
+
+Milestone: ${m.title}
+${this.goal.trim() ? `
+Goal: ${this.goal.trim()}
+` : ""}`;
+        try {
+          await this.ctx.milestones.create(this.project, m, body);
+          new import_obsidian4.Notice(`Created milestone ${id}`);
+          this.close();
+        } catch (e) {
+          new import_obsidian4.Notice(`Create failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      });
+    });
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
+// src/ui/backlog-view.ts
 var BACKLOG_VIEW_TYPE = "backlogmd-backlog";
-var BacklogView = class extends import_obsidian3.ItemView {
+var byOrdinal2 = (a, b) => (a.ordinal ?? Number.MAX_SAFE_INTEGER) - (b.ordinal ?? Number.MAX_SAFE_INTEGER) || (a.created_date ?? "").localeCompare(b.created_date ?? "") || a.id.localeCompare(b.id);
+var msNumber = (id) => parseInt(id.replace(/[^0-9]/g, ""), 10) || 0;
+var BacklogView = class extends import_obsidian5.ItemView {
   ctx;
+  projectIndex = 0;
   filter = "";
+  sectionsEl = null;
+  indicatorEl = null;
+  renderSeq = 0;
   constructor(leaf, ctx) {
     super(leaf);
     this.ctx = ctx;
@@ -6904,43 +7525,218 @@ var BacklogView = class extends import_obsidian3.ItemView {
   async onOpen() {
     await this.render();
   }
+  async onClose() {
+    this.removeIndicator();
+  }
   async render() {
     const container = this.containerEl.children[1];
     container.empty();
-    const project = this.ctx.projects[0];
+    this.sectionsEl = null;
+    const project = this.ctx.projects[this.projectIndex];
     if (!project) {
       container.createEl("div", { text: "No project", cls: "backlogmd-empty" });
       return;
     }
-    const input = container.createEl("input", { type: "text", placeholder: "Filter..." });
+    const toolbar = container.createDiv({ cls: "backlogmd-toolbar" });
+    renderProjectSwitcher(toolbar, this.ctx.projects, this.projectIndex, (i) => {
+      this.projectIndex = i;
+      void this.render();
+    });
+    const input = toolbar.createEl("input", { type: "text", cls: "backlogmd-filter", placeholder: "Filter by id, title, type, assignee" });
     input.value = this.filter;
     input.addEventListener("input", () => {
       this.filter = input.value;
-      this.renderList(container, project);
+      void this.renderSections(project);
     });
-    const list = container.createDiv();
-    await this.renderList(list, project);
+    const newTask = toolbar.createEl("button", { text: "+ New task", cls: "backlogmd-new-task" });
+    newTask.addEventListener("click", () => this.openTaskModal(project, null));
+    const newMilestone = toolbar.createEl("button", { text: "+ Milestone", cls: "backlogmd-new-task" });
+    newMilestone.addEventListener("click", () => {
+      void this.ctx.milestones.list(project).then((all) => {
+        const modal = new MilestoneModal(this.app, this.ctx, project, all);
+        const origClose = modal.onClose.bind(modal);
+        modal.onClose = () => {
+          origClose();
+          void this.renderSections(project);
+        };
+        modal.open();
+      });
+    });
+    this.sectionsEl = container.createDiv({ cls: "backlogmd-sections" });
+    await this.renderSections(project);
   }
-  async renderList(container, project) {
-    const lists = container.querySelectorAll(".backlogmd-list");
-    lists.forEach((n) => n.remove());
-    const ul = container.createDiv({ cls: "backlogmd-list" });
-    const tasks = await this.ctx.repo.list(project);
-    const q = this.filter.toLowerCase();
-    for (const t of tasks) {
-      if (q && !t.title.toLowerCase().includes(q) && t.type !== q) continue;
-      const row = ul.createDiv({ cls: "backlogmd-card" });
-      row.createEl("span", { text: `${t.id} ${t.title}` });
-      if (t.type) row.createEl("small", { text: ` [${t.type}]` });
+  buildSections(project, tasks, milestones) {
+    const done = new Set(project.doneStatuses);
+    const active = milestones.find((m) => m.state === "active");
+    const sections = [];
+    if (active) {
+      sections.push({ milestoneId: active.id, milestone: active, tasks: tasks.filter((t) => t.milestone === active.id).sort(byOrdinal2) });
     }
+    const planned = milestones.filter((m) => effectiveState(m, tasks, [...done]) !== "completed" && m.id !== active?.id).sort((a, b) => msNumber(a.id) - msNumber(b.id) || a.id.localeCompare(b.id));
+    for (const m of planned) {
+      sections.push({ milestoneId: m.id, milestone: m, tasks: tasks.filter((t) => t.milestone === m.id).sort(byOrdinal2) });
+    }
+    sections.push({
+      milestoneId: null,
+      tasks: tasks.filter((t) => !t.milestone).sort(byOrdinal2)
+    });
+    return sections;
+  }
+  async renderSections(project) {
+    const seq2 = ++this.renderSeq;
+    const host = this.sectionsEl;
+    if (!host) return;
+    host.empty();
+    this.removeIndicator();
+    const tasks = await this.ctx.repo.list(project);
+    const milestones = await this.ctx.milestones.list(project);
+    if (seq2 !== this.renderSeq) return;
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    const q = this.filter.trim().toLowerCase();
+    const matches = (t) => !q || t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || (t.type ?? "").toLowerCase().includes(q) || (t.assignee ?? []).join(" ").toLowerCase().includes(q) || (t.labels ?? []).join(" ").toLowerCase().includes(q);
+    for (const section of this.buildSections(project, tasks, milestones)) {
+      const visible = section.tasks.filter(matches);
+      const el = host.createDiv({ cls: "backlogmd-section" });
+      const header = el.createDiv({ cls: "backlogmd-section-header" });
+      if (section.milestone) {
+        const state = section.milestone.state === "active" ? "active" : "planned";
+        header.createEl("span", { text: state, cls: `backlogmd-chip ${state === "active" ? "backlogmd-chip-active" : ""}` });
+        header.createEl("span", { text: section.milestone.id, cls: "backlogmd-section-id" });
+        header.createEl("span", { text: section.milestone.title, cls: "backlogmd-section-title" });
+        const metaBits = [];
+        if (section.milestone.end_date) {
+          const dl = daysLeft(section.milestone);
+          metaBits.push(dl !== null ? `ends ${section.milestone.end_date} (${dl >= 0 ? `${dl}d left` : `${-dl}d over`})` : "");
+        }
+        const doneCount = section.tasks.filter((t) => project.doneStatuses.includes(t.status)).length;
+        metaBits.push(`${doneCount}/${section.tasks.length} done`);
+        header.createEl("span", { text: metaBits.filter(Boolean).join(" \xB7 "), cls: "backlogmd-section-meta" });
+        if (section.milestone.goal) header.createEl("span", { text: section.milestone.goal, cls: "backlogmd-section-goal", title: "Goal" });
+        const actions = header.createDiv({ cls: "backlogmd-section-actions" });
+        if (section.milestone.state !== "active") {
+          const start = actions.createEl("button", { text: "Start", cls: "backlogmd-section-btn" });
+          start.addEventListener("click", async () => {
+            await startMilestone(this.ctx.repo, this.ctx.milestones, project, section.milestone);
+            await this.renderSections(project);
+          });
+        }
+        const complete = actions.createEl("button", { text: "Complete", cls: "backlogmd-section-btn" });
+        complete.addEventListener("click", async () => {
+          await completeMilestone(this.ctx.repo, this.ctx.milestones, project, section.milestone, tasks);
+          await this.renderSections(project);
+        });
+      } else {
+        header.createEl("span", { text: "Backlog", cls: "backlogmd-section-title" });
+        header.createEl("span", { text: `${section.tasks.length}`, cls: "backlogmd-section-meta" });
+      }
+      const rowsEl = el.createDiv({ cls: "backlogmd-rows" });
+      for (const t of visible) {
+        rowsEl.appendChild(this.renderRow(project, t, byId));
+      }
+      rowsEl.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        this.showIndicator(rowsEl, e.clientY, e.dataTransfer?.getData("text/plain") ?? null);
+      });
+      rowsEl.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        this.removeIndicator();
+        const id = e.dataTransfer?.getData("text/plain");
+        if (!id) return;
+        await this.handleDrop(project, section, tasks, id, e.clientY, rowsEl);
+      });
+    }
+  }
+  renderRow(project, task, byId) {
+    const row = createEl("div", { cls: "backlogmd-row" });
+    row.dataset.id = task.id;
+    const blocked = isBlocked(task, byId, project.doneStatuses);
+    if (blocked) row.addClass("blocked");
+    row.createEl("span", { text: task.id, cls: "backlogmd-card-id" });
+    if (task.type) row.createEl("span", { text: task.type, cls: "backlogmd-badge" });
+    row.createEl("span", { text: task.title, cls: "backlogmd-row-title" });
+    const right = row.createDiv({ cls: "backlogmd-row-right" });
+    if (task.priority) right.createEl("span", { text: task.priority, cls: `backlogmd-badge backlogmd-p-${task.priority}` });
+    if (task.assignee?.length) right.createEl("span", { text: task.assignee.join(", "), cls: "backlogmd-assignee" });
+    if (blocked) right.createEl("span", { text: "\u26D4", cls: "backlogmd-blocked", title: "Blocked by unfinished dependencies" });
+    right.createEl("span", { text: task.status, cls: "backlogmd-row-status" });
+    row.setAttribute("draggable", "true");
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("text/plain", task.id);
+      row.addClass("dragging");
+    });
+    row.addEventListener("dragend", () => row.removeClass("dragging"));
+    row.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey) {
+        const file = this.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof import_obsidian5.TFile) this.app.workspace.getLeaf(true).openFile(file);
+      } else {
+        this.openTaskModal(project, task);
+      }
+    });
+    return row;
+  }
+  dropIndex(rowsEl, clientY, draggedId) {
+    const rows = Array.from(rowsEl.querySelectorAll(".backlogmd-row")).filter((r) => r.dataset.id !== draggedId);
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i].getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) return i;
+    }
+    return rows.length;
+  }
+  showIndicator(rowsEl, clientY, draggedId) {
+    this.removeIndicator();
+    const index = this.dropIndex(rowsEl, clientY, draggedId);
+    const line = createEl("div", { cls: "backlogmd-drop-line" });
+    this.indicatorEl = line;
+    const rows = Array.from(rowsEl.querySelectorAll(".backlogmd-row")).filter((r) => r.dataset.id !== draggedId);
+    if (index >= rows.length) rowsEl.appendChild(line);
+    else if (rows[index]) rowsEl.insertBefore(line, rows[index]);
+  }
+  removeIndicator() {
+    this.indicatorEl?.remove();
+    this.indicatorEl = null;
+  }
+  async handleDrop(project, section, allTasks, id, clientY, rowsEl) {
+    const dragged = allTasks.find((t) => t.id === id);
+    if (!dragged) return;
+    if ((dragged.milestone ?? null) === section.milestoneId) {
+      if (this.filter.trim()) return;
+      const index = this.dropIndex(rowsEl, clientY, id);
+      const from = section.tasks.findIndex((t) => t.id === id);
+      if (from === -1) return;
+      const ordered = [...section.tasks];
+      ordered.splice(from, 1);
+      ordered.splice(index, 0, dragged);
+      if (ordered.every((t, i) => t === section.tasks[i])) return;
+      await reorderColumn(this.ctx.repo, project, ordered);
+    } else {
+      await planTask(this.ctx.repo, project, dragged, section.milestoneId, allTasks);
+    }
+    await this.renderSections(project);
+  }
+  openTaskModal(project, task) {
+    void Promise.all([this.ctx.repo.list(project), this.ctx.milestones.list(project)]).then(([all, milestones]) => {
+      const active = milestones.find((m) => m.state === "active");
+      const modal = new TaskModal(this.app, this.ctx, project, task, all, active?.id);
+      const origClose = modal.onClose.bind(modal);
+      modal.onClose = () => {
+        origClose();
+        void this.renderSections(project);
+      };
+      modal.open();
+    });
   }
 };
 
 // src/ui/milestone-view.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 var MILESTONE_VIEW_TYPE = "backlogmd-milestones";
-var MilestoneView = class extends import_obsidian4.ItemView {
+var byMilestoneId = (a, b) => a.id.localeCompare(b.id, void 0, { numeric: true });
+var MilestoneView = class extends import_obsidian6.ItemView {
   ctx;
+  projectIndex = 0;
+  listEl = null;
+  renderSeq = 0;
   constructor(leaf, ctx) {
     super(leaf);
     this.ctx = ctx;
@@ -6952,113 +7748,170 @@ var MilestoneView = class extends import_obsidian4.ItemView {
     return "Milestones";
   }
   async onOpen() {
+    await this.render();
+  }
+  async render() {
+    try {
+      await this.renderInner();
+    } catch (e) {
+      console.error("[backlogmd] milestones render failed:", e.stack ?? String(e));
+      throw e;
+    }
+  }
+  async renderInner() {
     const container = this.containerEl.children[1];
     container.empty();
-    const project = this.ctx.projects[0];
+    this.listEl = null;
+    const project = this.ctx.projects[this.projectIndex];
     if (!project) {
-      container.createEl("div", { text: "No project", cls: "backlogmd-empty" });
+      container.createEl("div", { text: "No backlog project found.", cls: "backlogmd-empty" });
       return;
     }
-    const tasks = await this.ctx.repo.list(project);
-    const ms = new Set(tasks.map((t) => t.milestone).filter(Boolean));
-    container.createEl("h3", { text: "Milestones" });
-    for (const m of ms) {
-      const btn = container.createEl("button", { text: String(m) });
-      btn.addEventListener("click", async () => {
-        container.querySelectorAll(".ms-tasks").forEach((n) => n.remove());
-        const div = container.createDiv({ cls: "ms-tasks" });
-        for (const t of tasks.filter((x) => x.milestone === m)) {
-          div.createEl("div", { text: `${t.id} ${t.title}` });
-        }
+    const toolbar = container.createDiv({ cls: "backlogmd-toolbar" });
+    renderProjectSwitcher(toolbar, this.ctx.projects, this.projectIndex, (i) => {
+      this.projectIndex = i;
+      void this.render();
+    });
+    this.listEl = container.createDiv({ cls: "backlogmd-milestone-list" });
+    await this.renderList(project);
+  }
+  async renderList(project) {
+    const host = this.listEl;
+    if (!host) return;
+    const seq2 = ++this.renderSeq;
+    host.empty();
+    const [tasks, milestones] = await Promise.all([this.ctx.repo.list(project), this.ctx.milestones.list(project)]);
+    if (seq2 !== this.renderSeq) return;
+    if (milestones.length === 0) {
+      host.createEl("div", { text: "No milestones in backlog/milestones/.", cls: "backlogmd-empty" });
+      return;
+    }
+    for (const m of [...milestones].sort(byMilestoneId)) {
+      const msTasks = tasks.filter((t) => t.milestone === m.id);
+      const state = effectiveState(m, msTasks, project.doneStatuses);
+      const done = msTasks.filter((t) => project.doneStatuses.includes(t.status)).length;
+      const row = host.createDiv({ cls: "backlogmd-milestone-row" });
+      const header = row.createDiv({ cls: "backlogmd-milestone-header" });
+      header.createEl("span", { text: state, cls: `backlogmd-chip${state === "active" ? " backlogmd-chip-active" : ""}` });
+      header.createEl("span", { text: m.id, cls: "backlogmd-section-id" });
+      header.createEl("span", { text: m.title, cls: "backlogmd-section-title" });
+      const bits = [];
+      if (m.end_date) {
+        const dl = daysLeft(m);
+        bits.push(dl !== null ? dl >= 0 ? `ends ${m.end_date} \xB7 ${dl}d left` : `overdue by ${-dl}d` : `ends ${m.end_date}`);
+      }
+      bits.push(`${done}/${msTasks.length} done`);
+      header.createEl("span", { text: bits.join(" \xB7 "), cls: "backlogmd-section-meta" });
+      const details = row.createDiv({ cls: "backlogmd-milestone-tasks" });
+      details.style.display = "none";
+      for (const t of msTasks) {
+        const line = details.createDiv({ cls: "backlogmd-milestone-task" });
+        line.createEl("span", { text: t.id, cls: "backlogmd-card-id" });
+        line.createEl("span", { text: t.status, cls: "backlogmd-row-status" });
+        line.createEl("span", { text: t.title, cls: "backlogmd-row-title" });
+      }
+      header.addEventListener("click", () => {
+        details.style.display = details.style.display === "none" ? "" : "none";
       });
     }
   }
 };
 
-// src/ui/task-modal.ts
-var import_obsidian5 = require("obsidian");
+// src/ui/pull-issues-modal.ts
+var import_obsidian7 = require("obsidian");
 
-// src/application/create-task.ts
-async function createTask(repo, project, input, existingCount) {
-  const id = `${project.taskPrefix.toUpperCase()}-${existingCount + 1}`;
-  const task = {
-    id,
-    title: input.summary,
-    status: input.status ?? project.statuses[0] ?? "To Do",
-    type: input.type,
-    priority: input.priority,
-    path: ""
-  };
-  return repo.create(project, task, "");
+// src/infrastructure/github.ts
+async function fetchIssues(token, owner, repo) {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100`, {
+    headers: { Authorization: `token ${token}`, Accept: "application/vnd.github+json" }
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  const all = await res.json();
+  return all.filter((i) => i.pull_request === void 0);
 }
 
-// src/application/edit-task.ts
-async function editTask(repo, project, task, patch, body) {
-  const updated = { ...task, ...patch, updated_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) };
-  await repo.write(project, updated, body ?? task.body ?? "");
+// src/application/pull-issues.ts
+function nextTaskId2(existing, prefix) {
+  const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[-_ ]?(\\d+)$`, "i");
+  let max = 0;
+  for (const t of existing) {
+    const m = t.id.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
+}
+async function pullIssues(repo, project, token, owner, repository) {
+  const issues = await fetchIssues(token, owner, repository);
+  const existing = [...await repo.list(project)];
+  for (const issue of issues) {
+    const sourceRef = `github:${owner}/${repository}#${issue.number}`;
+    const match = existing.find((t) => t.references?.includes(sourceRef));
+    if (match) {
+      const closed = issue.state === "closed";
+      const newStatus = closed ? project.doneStatuses[0] ?? match.status : match.status;
+      await repo.write(project, { ...match, title: issue.title, assignee: issue.assignee ? [issue.assignee] : match.assignee, status: newStatus }, match.body ?? "");
+    } else {
+      const id = nextTaskId2(existing, project.taskPrefix);
+      const task = {
+        id,
+        title: issue.title,
+        status: issue.state === "closed" ? project.doneStatuses[0] ?? project.statuses[0] : project.statuses[0] ?? "To Do",
+        assignee: issue.assignee ? [issue.assignee] : void 0,
+        references: [sourceRef],
+        body: issue.body ? `\`\`\`
+${issue.body}
+\`\`\`` : "",
+        path: ""
+      };
+      await repo.create(project, task, task.body ?? "");
+      existing.push(task);
+    }
+  }
 }
 
-// src/ui/task-modal.ts
-var TaskModal = class extends import_obsidian5.Modal {
-  ctx;
-  project;
-  task;
-  summary = "";
-  type = "";
-  priority = "";
-  status = "";
-  constructor(app, ctx, project, task) {
+// src/ui/pull-issues-modal.ts
+var PullIssuesModal = class extends import_obsidian7.Modal {
+  constructor(app, ctx, project, tokenKey) {
     super(app);
     this.ctx = ctx;
     this.project = project;
-    this.task = task;
-    if (task) {
-      this.summary = task.title;
-      this.type = task.type ?? "";
-      this.priority = task.priority ?? "";
-      this.status = task.status;
-    } else {
-      this.status = project.statuses[0] ?? "To Do";
-    }
+    this.tokenKey = tokenKey;
   }
-  onOpen() {
+  owner = "";
+  repository = "";
+  token = "";
+  async onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: this.task ? "Edit task" : "Create task" });
-    new import_obsidian5.Setting(contentEl).setName("Summary").addText((t) => {
-      t.setValue(this.summary).onChange((v) => this.summary = v);
+    contentEl.createEl("h2", { text: "Pull issues from GitHub" });
+    contentEl.createEl("p", {
+      text: "Imports repository issues into the project's tasks (one-way). Later pulls keep title, assignee and open/closed state in step; local planning fields are never overwritten.",
+      cls: "backlogmd-modal-desc"
     });
-    new import_obsidian5.Setting(contentEl).setName("Type").addDropdown((d) => {
-      d.addOption("", "");
-      for (const ty of this.project.types) d.addOption(ty, ty);
-      d.setValue(this.type).onChange((v) => this.type = v);
+    const hasStored = await this.app.secretStorage.getSecret(this.tokenKey) !== null;
+    new import_obsidian7.Setting(contentEl).setName("Owner").addText((t) => t.setPlaceholder("owner").setValue(this.owner).onChange((v) => this.owner = v));
+    new import_obsidian7.Setting(contentEl).setName("Repository").addText((t) => t.setPlaceholder("repo").setValue(this.repository).onChange((v) => this.repository = v));
+    new import_obsidian7.Setting(contentEl).setName("Token").setDesc("Optional for public repos; stored in Obsidian secret storage").addText((t) => {
+      t.setPlaceholder(hasStored ? "stored \u2014 leave blank to keep" : "ghp_\u2026");
+      t.inputEl.type = "password";
+      t.onChange((v) => this.token = v);
     });
-    new import_obsidian5.Setting(contentEl).setName("Priority").addDropdown((d) => {
-      d.addOption("", "");
-      for (const p of this.project.priorities) d.addOption(p, p);
-      d.setValue(this.priority).onChange((v) => this.priority = v);
-    });
-    new import_obsidian5.Setting(contentEl).setName("Status").addDropdown((d) => {
-      for (const s of this.project.statuses) d.addOption(s, s);
-      d.setValue(this.status).onChange((v) => this.status = v);
-    });
-    new import_obsidian5.Setting(contentEl).addButton((b) => {
-      b.setButtonText(this.task ? "Save" : "Create");
+    new import_obsidian7.Setting(contentEl).addButton((b) => {
+      b.setButtonText("Pull");
       b.setCta();
       b.onClick(async () => {
-        if (!this.summary.trim()) return;
-        if (this.task) {
-          await editTask(this.ctx.repo, this.project, this.task, {
-            title: this.summary,
-            type: this.type || void 0,
-            priority: this.priority || void 0,
-            status: this.status
-          });
-        } else {
-          const input = { summary: this.summary, type: this.type || void 0, priority: this.priority || void 0, status: this.status };
-          const tasks = await this.ctx.repo.list(this.project);
-          await createTask(this.ctx.repo, this.project, input, tasks.length);
+        const owner = this.owner.trim();
+        const repository = this.repository.trim();
+        if (!owner || !repository) return;
+        const stored = await this.app.secretStorage.getSecret(this.tokenKey) ?? "";
+        const token = this.token.trim() || stored;
+        if (this.token.trim()) await this.app.secretStorage.setSecret(this.tokenKey, this.token.trim());
+        try {
+          await pullIssues(this.ctx.repo, this.project, token, owner, repository);
+          new import_obsidian7.Notice(`Pulled issues from ${owner}/${repository}`);
+          this.close();
+        } catch (e) {
+          new import_obsidian7.Notice(`Pull failed: ${e instanceof Error ? e.message : String(e)}`);
         }
-        this.close();
       });
     });
   }
@@ -7068,51 +7921,53 @@ var TaskModal = class extends import_obsidian5.Modal {
 };
 
 // src/settings/settings-tab.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 var DEFAULT_SETTINGS = {
   manualRoots: [],
-  activeProject: "",
   githubTokenKey: "backlogmd-github-token"
 };
-var BacklogMdSettingTab = class extends import_obsidian6.PluginSettingTab {
-  ctx;
+var BacklogMdSettingTab = class extends import_obsidian8.PluginSettingTab {
+  plugin;
   settings;
-  constructor(app, plugin, ctx, settings) {
+  constructor(app, plugin, settings) {
     super(app, plugin);
-    this.ctx = ctx;
+    this.plugin = plugin;
     this.settings = settings;
   }
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian6.Setting(containerEl).setName("Manual roots").setDesc("Comma-separated vault folders").addText((t) => {
+    const save = () => void this.plugin.saveData(this.settings);
+    new import_obsidian8.Setting(containerEl).setName("Manual roots").setDesc("Comma-separated vault folders").addText((t) => {
       t.setValue(this.settings.manualRoots.join(", ")).onChange((v) => {
         this.settings.manualRoots = v.split(",").map((s) => s.trim()).filter(Boolean);
+        save();
       });
     });
-    new import_obsidian6.Setting(containerEl).setName("GitHub token (secret storage key)").addText((t) => {
+    new import_obsidian8.Setting(containerEl).setName("GitHub token (secret storage key)").setDesc("Obsidian secret storage key the pull dialog reads the token from").addText((t) => {
       t.setValue(this.settings.githubTokenKey).onChange((v) => {
         this.settings.githubTokenKey = v;
+        save();
       });
     });
   }
 };
 
 // src/infrastructure/watcher.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 var FileWatcher = class {
   timer = null;
   cb;
   constructor(app, cb) {
     this.cb = cb;
     app.vault.on("modify", (file) => {
-      if (file instanceof import_obsidian7.TFile && file.extension === "md") this.schedule();
+      if (file instanceof import_obsidian9.TFile && file.extension === "md") this.schedule();
     });
     app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian7.TFile && file.extension === "md") this.schedule();
+      if (file instanceof import_obsidian9.TFile && file.extension === "md") this.schedule();
     });
     app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian7.TFile && file.extension === "md") this.schedule();
+      if (file instanceof import_obsidian9.TFile && file.extension === "md") this.schedule();
     });
   }
   schedule() {
@@ -7124,13 +7979,49 @@ var FileWatcher = class {
   }
 };
 
+// src/ui/task-note-header.ts
+var import_obsidian10 = require("obsidian");
+var MARKER = "backlogmd-edit-task";
+function projectForPath(projects, path2) {
+  for (const project of projects) {
+    if (path2.startsWith(`${project.vaultBacklogDir}/tasks/`)) return project;
+  }
+  return null;
+}
+function syncTaskHeaderButtons(app, ctx) {
+  for (const leaf of app.workspace.getLeavesOfType("markdown")) {
+    const view = leaf.view;
+    const headerHost = view;
+    const headerEl = headerHost.headerEl;
+    if (!headerEl) continue;
+    headerEl.querySelectorAll(`.${MARKER}`).forEach((n) => n.remove());
+    const file = view.file;
+    if (!(file instanceof import_obsidian10.TFile)) continue;
+    const project = projectForPath(ctx.projects, file.path);
+    if (!project) continue;
+    const btn = headerEl.createEl("div", { cls: `clickable-icon ${MARKER}`, title: "Edit task" });
+    (0, import_obsidian10.setIcon)(btn, "pencil");
+    btn.addEventListener("click", () => {
+      void ctx.repo.list(project).then((all) => {
+        const t = all.find((x) => x.path === file.path);
+        if (t) new TaskModal(app, ctx, project, t, all).open();
+      });
+    });
+  }
+}
+
 // src/main.ts
-var BacklogMdPlugin = class extends import_obsidian8.Plugin {
+var BacklogMdPlugin = class extends import_obsidian11.Plugin {
   ctx;
   settings = DEFAULT_SETTINGS;
   async onload() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     this.ctx = compose(this);
-    await this.ctx.start();
+    await this.ctx.start(this.settings.manualRoots);
+    console.log(
+      "[backlogmd] discovered projects:",
+      this.ctx.projects.map((p) => `${p.name} (${p.vaultBacklogDir})`).join(", ") || "(none)"
+    );
     this.registerView(KANBAN_VIEW_TYPE, (leaf) => new KanbanView(leaf, this.ctx));
     this.registerView(BACKLOG_VIEW_TYPE, (leaf) => new BacklogView(leaf, this.ctx));
     this.registerView(MILESTONE_VIEW_TYPE, (leaf) => new MilestoneView(leaf, this.ctx));
@@ -7138,14 +8029,39 @@ var BacklogMdPlugin = class extends import_obsidian8.Plugin {
     this.addCommand({ id: "open-backlog", name: "Open backlog", callback: () => this.activateView(BACKLOG_VIEW_TYPE) });
     this.addCommand({ id: "open-milestones", name: "Open milestones", callback: () => this.activateView(MILESTONE_VIEW_TYPE) });
     this.addCommand({ id: "create-task", name: "Create task", callback: () => {
-      const project = this.ctx.projects[0];
-      if (project) new TaskModal(this.app, this.ctx, project, null).open();
+      const project = this.projectFromViews();
+      if (project) void this.ctx.repo.list(project).then((all) => new TaskModal(this.app, this.ctx, project, null, all).open());
     } });
-    this.addSettingTab(new BacklogMdSettingTab(this.app, this, this.ctx, this.settings));
+    this.addCommand({ id: "pull-issues", name: "Pull issues from GitHub repository", callback: () => {
+      const project = this.projectFromViews();
+      if (project) new PullIssuesModal(this.app, this.ctx, project, this.settings.githubTokenKey).open();
+    } });
+    this.addCommand({ id: "create-milestone", name: "Create milestone (sprint)", callback: () => {
+      const project = this.projectFromViews();
+      if (project) void this.ctx.milestones.list(project).then((all) => new MilestoneModal(this.app, this.ctx, project, all).open());
+    } });
+    this.addSettingTab(new BacklogMdSettingTab(this.app, this, this.settings));
+    this.registerEvent(this.app.workspace.on("file-open", () => syncTaskHeaderButtons(this.app, this.ctx)));
+    this.app.workspace.onLayoutReady(() => syncTaskHeaderButtons(this.app, this.ctx));
     new FileWatcher(this.app, () => {
-      this.app.workspace.getLeavesOfType(KANBAN_VIEW_TYPE).forEach((l) => l.view.render());
-      this.app.workspace.getLeavesOfType(BACKLOG_VIEW_TYPE).forEach((l) => l.view.render());
+      const reRender = (type2) => {
+        for (const l of this.app.workspace.getLeavesOfType(type2)) {
+          const v = l.view;
+          if (v && typeof v.render === "function") void v.render();
+        }
+      };
+      reRender(KANBAN_VIEW_TYPE);
+      reRender(BACKLOG_VIEW_TYPE);
+      reRender(MILESTONE_VIEW_TYPE);
     });
+  }
+  // Follow the project selected in an open board/backlog view, else the first project.
+  projectFromViews() {
+    const k = this.app.workspace.getLeavesOfType(KANBAN_VIEW_TYPE)[0]?.view;
+    const b = this.app.workspace.getLeavesOfType(BACKLOG_VIEW_TYPE)[0]?.view;
+    const view = k ?? b;
+    const idx = view ? view.projectIndex : 0;
+    return this.ctx.projects[idx] ?? this.ctx.projects[0] ?? null;
   }
   async activateView(type2) {
     const leaves = this.app.workspace.getLeavesOfType(type2);

@@ -538,10 +538,10 @@ def _candidate_count(admin_client: Any, replica_id: str) -> int | None:
         return None
     try:
         ns = _own_namespace()
-        pod = admin_client.get_pod(ns, replica_id)
-        if not pod:
+        pods = admin_client.get_pod(ns, replica_id)
+        if not pods:
             return None
-        refs = (pod.get("metadata") or {}).get("ownerReferences") or []
+        refs = (pods[0].get("metadata") or {}).get("ownerReferences") or []
         rs_name = next(
             (r["name"] for r in refs if r.get("kind") == "ReplicaSet"), None
         )
@@ -549,10 +549,10 @@ def _candidate_count(admin_client: Any, replica_id: str) -> int | None:
             return None
         # ReplicaSet name = "<deployment>-<rs-hash>" — strip the hash.
         dep_name = rs_name.rsplit("-", 1)[0]
-        dep = admin_client.get_deployment(ns, dep_name)
-        if not dep:
+        deps = admin_client.get_deployment(ns, dep_name)
+        if not deps:
             return None
-        replicas = (dep.get("spec") or {}).get("replicas")
+        replicas = (deps[0].get("spec") or {}).get("replicas")
         return int(replicas) if replicas is not None else None
     except Exception:  # noqa: BLE001 — best-effort by contract (F14)
         return None

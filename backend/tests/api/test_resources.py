@@ -109,13 +109,47 @@ class FakeK8s:
         # The ?labelSelector= query (the service-views change) is recorded:
         # the pods-labelselector tests assert the pass-through value.
         self.last_pod_label_selector: str | None = label_selector
+        # The pods-deployments-views change: the namespace-forwarding seam
+        # the API tests assert (the real K8sClient.list_pods forwards it).
+        self.pod_ns_calls: list[str | None] = []
+        self.pod_ns_calls.append(namespace)
         if namespace is None:
+            # The all-namespaces branch is DISTINCTLY named (team-b) so the
+            # API tests can tell the branches apart, mirroring
+            # list_network_policies.
             return [
-                {"metadata": {"name": "kubedash-pod", "namespace": "default"}},
-                {"metadata": {"name": "other-pod", "namespace": "kube-system"}},
+                {
+                    "metadata": {
+                        "name": "kubedash-pod",
+                        "namespace": "team-b",
+                        "creation_timestamp": "2026-01-02T03:04:05Z",
+                    },
+                    "spec": {"node_name": "node-1"},
+                    "status": {"phase": "Running", "pod_ip": "10.0.0.6"},
+                },
             ]
         return [
-            {"metadata": {"name": "kubedash-pod", "namespace": namespace}},
+            {
+                "metadata": {
+                    "name": "web-1",
+                    "namespace": namespace,
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"app": "web"},
+                    "annotations": {},
+                    "owner_references": [{"kind": "ReplicaSet", "name": "web-abc12"}],
+                },
+                "spec": {
+                    "node_name": "node-1",
+                    "containers": [{"name": "app", "image": "web:1"}],
+                },
+                "status": {
+                    "phase": "Running",
+                    "pod_ip": "10.0.0.5",
+                    "container_statuses": [
+                        {"name": "app", "ready": True, "restart_count": 2}
+                    ],
+                },
+            }
         ]
 
     def list_nodes(self, _namespace: str | None) -> list[dict]:
@@ -1053,6 +1087,55 @@ class FakeK8s:
             return self.list_horizontal_pod_autoscalers(namespace)
         return []
 
+    def get_pod(self, namespace: str, name: str) -> list[dict]:
+        # The pods-deployments-views change: the generic route's ?name=
+        # lookup for the pods kind (0/1-item contract, mirroring
+        # get_horizontal_pod_autoscaler).
+        if name == "web-1":
+            return self.list_pods(namespace)
+        return []
+
+    def list_deployments(self, namespace: str | None) -> list[dict]:
+        # Namespaced kind (apps/v1, group apps): the namespace is forwarded
+        # (the real K8sClient.list_deployments pattern). The all-namespaces
+        # branch is DISTINCTLY named (team-b).
+        self.deployment_ns_calls: list[str | None] = []
+        self.deployment_ns_calls.append(namespace)
+        if namespace is None:
+            return [
+                {
+                    "metadata": {"name": "web", "namespace": "team-b"},
+                    "spec": {"replicas": 3},
+                    "status": {"replicas": 3, "ready_replicas": 3},
+                },
+            ]
+        return [
+            {
+                "metadata": {
+                    "name": "web",
+                    "namespace": namespace or "team-a",
+                    "creation_timestamp": "2026-01-02T03:04:05Z",
+                    "labels": {"app": "web"},
+                    "annotations": {},
+                },
+                "spec": {
+                    "replicas": 3,
+                    "selector": {"match_labels": {"app": "web"}},
+                    "template": {
+                        "spec": {
+                            "containers": [{"name": "app", "image": "web:1"}],
+                        }
+                    },
+                },
+                "status": {"replicas": 3, "ready_replicas": 2},
+            }
+        ]
+
+    def get_deployment(self, namespace: str, name: str) -> list[dict]:
+        if name == "web":
+            return self.list_deployments(namespace)
+        return []
+
     def list_limit_ranges(self, namespace: str | None) -> list[dict]:
         # Namespaced kind (core): the namespace is forwarded (the real
         # K8sClient.list_limit_ranges pattern). The all-namespaces branch is
@@ -1082,8 +1165,8 @@ class FakeK8s:
                             "max": {"cpu": "2", "memory": "4Gi"},
                             "min": {"cpu": "500m", "memory": "1Gi"},
                             "default": {"cpu": "1", "memory": "2Gi"},
-                            "defaultRequest": {"cpu": "250m", "memory": "512Mi"},
-                            "maxLimitRequestRatio": {"cpu": "2", "memory": "4"},
+                            "default_request": {"cpu": "250m", "memory": "512Mi"},
+                            "max_limit_request_ratio": {"cpu": "2", "memory": "4"},
                         }
                     ]
                 },
@@ -1695,11 +1778,14 @@ def test_get_secret_asks_sar_for_get_on_that_name(
 def test_name_lookup_on_kind_without_getter_404(
     api_client, auth_client, fake_k8s, monkeypatch
 ) -> None:
+    # namespaces is in _KINDS but NOT _GETTERS: a ?name= lookup on it is a
+    # 404 before any SAR or client call (pods/deployments gained getters in
+    # the pods-deployments-views change, so they are no longer the example).
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
     _allow_sar(monkeypatch)
-    r = api_client.get("/api/v1/clusters/1/resources/pods?namespace=team-a&name=web", headers=h)
+    r = api_client.get("/api/v1/clusters/1/resources/namespaces?name=team-a", headers=h)
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
@@ -3352,6 +3438,248 @@ def test_horizontalpodautoscaler_kind_singular_rejected(api_client, auth_client)
     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
 
 
+def test_list_pods_200_in_namespace(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[pods-list-200-in-namespace] a bound user listing pods in one
+    namespace gets the to_dict items back, metadata (owner_references) and
+    status (phase, pod_ip, container_statuses) intact; the namespace is
+    forwarded to the client."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/pods?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "pods"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web-1"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["metadata"]["owner_references"][0]["kind"] == "ReplicaSet"
+    assert item["status"]["phase"] == "Running"
+    assert item["status"]["pod_ip"] == "10.0.0.5"
+    assert item["status"]["container_statuses"][0]["restart_count"] == 2
+    assert fake_k8s.pod_ns_calls == ["team-a"]
+
+
+def test_list_pods_all_namespaces_without_param(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[pods-list-all-namespaces-without-param] no namespace param uses the
+    all-namespaces branch (the existing ``_KINDS["pods"]`` behavior)."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get("/api/v1/clusters/1/resources/pods", headers=h)
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["namespace"] == "team-b"
+    assert fake_k8s.pod_ns_calls == [None]
+
+
+def test_list_pods_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[pods-get-by-name] ?name= returns a 0/1-item list through the SAME
+    route — a hit is the single full object, a miss is ``[]`` (not a 404).
+    The SAR verb is ``get`` with the name."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked: list[tuple] = []
+    # The module-level seam (the app.api.resources package attribute is the
+    # blueprint instance, not the module — a string target through it
+    # resolves to the Api object and fails).
+    import app.services.rbac as rb
+
+    monkeypatch.setattr(
+        rb,
+        "can",
+        lambda *a, **kw: (asked.append(a[2:7]), True)[1],
+    )
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/pods?name=web-1&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web-1"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/pods?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    # a[2:7] = (verb, resource, namespace, name, group) — rbac.can's
+    # positional signature after user/cluster.
+    assert ("get", "pods", "team-a", "web-1", "") in asked
+    assert ("get", "pods", "team-a", "ghost", "") in asked
+
+
+def test_list_pods_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[pods-sar-denied] ADR-0004: the SAR is asked for ``list`` on
+    ``pods`` (group "") in the namespace BEFORE any K8s client call; on deny
+    the client call was never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked: list[tuple] = []
+    # The module-level seam (the app.api package attribute is the Api
+    # instance from app.extensions, not the submodule — a string target
+    # through it resolves to the Api object and fails).
+    import app.services.rbac as rb
+
+    def deny(*a, **kw):
+        # a[2:7] = (verb, resource, namespace, name, group) — rbac.can's
+        # positional signature after user/cluster.
+        asked.append(a[2:7])
+        return False
+
+    monkeypatch.setattr(rb, "can", deny)
+    r = api_client.get("/api/v1/clusters/1/resources/pods?namespace=team-a", headers=h)
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "pods", "team-a", None, "") in asked
+    assert not getattr(fake_k8s, "pod_ns_calls", [])  # the client call was not made
+
+
+def test_pods_binding_404(api_client, auth_client) -> None:
+    """[pods-binding-404] an unbound user: the binding gate fails before
+    the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/pods?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_pod_kind_singular_rejected(api_client, auth_client) -> None:
+    """[pod-kind-singular-rejected] the singular ``pod`` is not a kind —
+    RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/pod?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
+def test_list_deployments_200_in_namespace(
+    api_client, auth_client, fake_k8s, monkeypatch
+) -> None:
+    """[deployments-list-200-in-namespace] a bound user listing deployments
+    in one namespace gets the to_dict items back, spec (replicas, selector,
+    template) and status (replicas, ready_replicas) intact; the namespace is
+    forwarded to the client."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    _allow_sar(monkeypatch)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/deployments?namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["kind"] == "deployments"
+    [item] = body["items"]
+    assert item["metadata"]["name"] == "web"
+    assert item["metadata"]["namespace"] == "team-a"
+    assert item["spec"]["replicas"] == 3
+    assert item["spec"]["selector"]["match_labels"] == {"app": "web"}
+    assert item["status"]["replicas"] == 3
+    assert item["status"]["ready_replicas"] == 2
+    assert fake_k8s.deployment_ns_calls == ["team-a"]
+
+
+def test_list_deployments_get_by_name(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[deployments-get-by-name] ?name= returns a 0/1-item list through the
+    SAME route — a hit is the single full object, a miss is ``[]`` (not a
+    404). The SAR verb is ``get`` (group apps) with the name."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked: list[tuple] = []
+    # The module-level seam (the app.api package attribute is the Api
+    # instance from app.extensions, not the submodule — a string target
+    # through it resolves to the Api object and fails).
+    import app.services.rbac as rb
+
+    monkeypatch.setattr(
+        rb,
+        "can",
+        lambda *a, **kw: (asked.append(a[2:7]), True)[1],
+    )
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/deployments?name=web&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    [item] = r.get_json()["items"]
+    assert item["metadata"]["name"] == "web"
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/deployments?name=ghost&namespace=team-a", headers=h
+    )
+    assert r.status_code == 200
+    assert r.get_json()["items"] == []
+    # a[2:7] = (verb, resource, namespace, name, group) — rbac.can's
+    # positional signature after user/cluster.
+    assert ("get", "deployments", "team-a", "web", "apps") in asked
+    assert ("get", "deployments", "team-a", "ghost", "apps") in asked
+
+
+def test_list_deployments_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
+    """[deployments-sar-denied] ADR-0004: the SAR is asked for ``list`` on
+    ``deployments`` (group apps) in the namespace BEFORE any K8s client
+    call; on deny the client call was never made."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    asked: list[tuple] = []
+    # The module-level seam (the app.api package attribute is the Api
+    # instance from app.extensions, not the submodule — a string target
+    # through it resolves to the Api object and fails).
+    import app.services.rbac as rb
+
+    def deny(*a, **kw):
+        # a[2:7] = (verb, resource, namespace, name, group) — rbac.can's
+        # positional signature after user/cluster.
+        asked.append(a[2:7])
+        return False
+
+    monkeypatch.setattr(rb, "can", deny)
+    r = api_client.get(
+        "/api/v1/clusters/1/resources/deployments?namespace=team-a", headers=h
+    )
+    assert r.status_code == 403
+    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
+    assert ("list", "deployments", "team-a", None, "apps") in asked
+    assert not getattr(fake_k8s, "deployment_ns_calls", [])  # the client call was not made
+
+
+def test_deployments_binding_404(api_client, auth_client) -> None:
+    """[deployments-binding-404] an unbound user: the binding gate fails
+    before the SAR, CLUSTER_NOT_FOUND."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    r = api_client.get(
+        "/api/v1/clusters/999/resources/deployments?namespace=team-a", headers=h
+    )
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
+
+
+def test_deployment_kind_singular_rejected(api_client, auth_client) -> None:
+    """[deployment-kind-singular-rejected] the singular ``deployment`` is
+    not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
+    auth_client.login()
+    h = {"Authorization": f"Bearer {auth_client.jwt}"}
+    _register(api_client, h)
+    r = api_client.get("/api/v1/clusters/1/resources/deployment", headers=h)
+    assert r.status_code == 404
+    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+
+
 def test_list_limitranges_200(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[limitranges-list-200] a bound user listing limitranges in one
     namespace gets the to_dict items back, spec.limits intact; the namespace
@@ -3364,6 +3692,7 @@ def test_list_limitranges_200(api_client, auth_client, fake_k8s, monkeypatch) ->
     assert r.status_code == 200
     body = r.get_json()
     assert body["kind"] == "limitranges"
+    assert body["cluster"] == "prod"
     [item] = body["items"]
     assert item["metadata"]["name"] == "default"
     assert item["metadata"]["namespace"] == "team-a"
@@ -3371,7 +3700,7 @@ def test_list_limitranges_200(api_client, auth_client, fake_k8s, monkeypatch) ->
     assert limit["type"] == "Container"
     assert limit["max"] == {"cpu": "2", "memory": "4Gi"}
     assert limit["min"] == {"cpu": "500m", "memory": "1Gi"}
-    assert limit["defaultRequest"] == {"cpu": "250m", "memory": "512Mi"}
+    assert limit["default_request"] == {"cpu": "250m", "memory": "512Mi"}
 
 
 def test_list_limitranges_respects_namespace(
@@ -3432,7 +3761,8 @@ def test_list_limitranges_get_by_name(api_client, auth_client, fake_k8s, monkeyp
 def test_list_limitranges_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
     """[limitranges-sar-denied] ADR-0004: the SAR is asked BEFORE the read,
     on the CORE group ("") with the query namespace (namespaced kind) — a
-    deny short-circuits to 403 RBAC_DENIED."""
+    deny short-circuits to 403 RBAC_DENIED naming the resource, and the
+    client list call was never made."""
     auth_client.login()
     h = {"Authorization": f"Bearer {auth_client.jwt}"}
     _register(api_client, h)
@@ -3442,6 +3772,11 @@ def test_list_limitranges_sar_denied(api_client, auth_client, fake_k8s, monkeypa
     assert r.get_json()["error"]["code"] == "RBAC_DENIED"
     # core group + the namespace are the load-bearing assertions:
     assert ("list", "limitranges", "team-a", None, "") in asked
+    # the 403 names the denied resource (acceptance Then-clause).
+    assert "limitranges" in r.get_json()["error"]["message"]
+    # the client list call was never made — SAR precedes the read (the
+    # acceptance Then-clause; the hpa-views review pin pattern).
+    assert not getattr(fake_k8s, "limitrange_ns_calls", [])
 
 
 def test_limitranges_binding_404(api_client, auth_client) -> None:

@@ -82,6 +82,10 @@ const HorizontalPodAutoscalerDataView = React.lazy(
 )
 const LimitRangeView = React.lazy(() => import('./views/OtherResource/LimitRange'))
 const LimitRangeDataView = React.lazy(() => import('./views/OtherResource/LimitRangeData'))
+const PodsWorkloadView = React.lazy(() => import('./views/Workload/Pods'))
+const PodDataView = React.lazy(() => import('./views/Workload/PodData'))
+const DeploymentsWorkloadView = React.lazy(() => import('./views/Workload/Deployments'))
+const DeploymentDataView = React.lazy(() => import('./views/Workload/DeploymentData'))
 const StorageClassView = React.lazy(() => import('./views/Storage/StorageClass'))
 const StorageClassDataView = React.lazy(() => import('./views/Storage/StorageClassData'))
 const ConfigMapView = React.lazy(() => import('./views/Storage/ConfigMap'))
@@ -1004,6 +1008,66 @@ const App = () => {
                             kind="horizontalpodautoscaler"
                             listRoute="/other-resource/horizontal-pod-autoscaler"
                           />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/workload/pods"
+                      element={
+                        <ProtectedRoute>
+                          {/* pods-deployments-views: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route; the old /data URL is its R7 redirect. */}
+                          <ObjectRoute
+                            kind="pod"
+                            listRoute="/workload/pods"
+                            list={<PodsWorkloadView />}
+                            detail={(p) => (
+                              <PodDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/workload/pods/data"
+                      element={
+                        <ProtectedRoute>
+                          {/* R7: the legacy /data URL is a redirect, not a
+                              primary route — it hydrates the ref from the
+                              legacy ?name=/?namespace= and lands on the
+                              clean route's detail. */}
+                          <OldDataRedirect kind="pod" listRoute="/workload/pods" />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/workload/deployments"
+                      element={
+                        <ProtectedRoute>
+                          {/* pods-deployments-views: ObjectRoute renders the
+                              list or the ref-matched detail on the clean
+                              route; the old /data URL is its R7 redirect. */}
+                          <ObjectRoute
+                            kind="deployment"
+                            listRoute="/workload/deployments"
+                            list={<DeploymentsWorkloadView />}
+                            detail={(p) => (
+                              <DeploymentDataView name={p.name} namespace={p.namespace ?? ''} />
+                            )}
+                          />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/workload/deployments/data"
+                      element={
+                        <ProtectedRoute>
+                          {/* R7: the legacy /data URL is a redirect, not a
+                              primary route — it hydrates the ref from the
+                              legacy ?name=/?namespace= and lands on the
+                              clean route's detail. */}
+                          <OldDataRedirect kind="deployment" listRoute="/workload/deployments" />
                         </ProtectedRoute>
                       }
                     />

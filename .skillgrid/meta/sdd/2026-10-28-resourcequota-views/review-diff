@@ -1,0 +1,1296 @@
+diff --git a/backend/app/api/resources.py b/backend/app/api/resources.py
+index 81c6f692..597b6ec8 100644
+--- a/backend/app/api/resources.py
++++ b/backend/app/api/resources.py
+@@ -61,6 +61,10 @@ _KINDS: dict[str, tuple[str, str, str]] = {
+     # RuntimeClass (node.k8s.io, cluster-scoped) — the 4.1-parity nav leaf
+     # resolved by TASK-046 (list + data views; ADR-0022 placement).
+     "runtimeclasses": ("list_runtime_classes", "runtimeclasses", "node.k8s.io"),
++    # ResourceQuota (core, namespaced) — the 4.1-parity nav leaf resolved by
++    # TASK-047 (list + data views; ADR-0022 placement). The 4.1 route name was
++    # singular; the API kind is the plural.
++    "resourcequotas": ("list_resource_quotas", "resourcequotas", ""),
+ }
+ 
+ #: kind → K8sClient method for a single-object ``?name=`` lookup
+@@ -71,6 +75,7 @@ _GETTERS: dict[str, str] = {
+     "ciliumnetworkpolicies": "get_cilium_network_policy",
+     "priorityclasses": "get_priority_class",
+     "runtimeclasses": "get_runtime_class",
++    "resourcequotas": "get_resource_quota",
+ }
+ 
+ 
+diff --git a/backend/app/services/k8s_client.py b/backend/app/services/k8s_client.py
+index bf9a417b..4bd69862 100644
+--- a/backend/app/services/k8s_client.py
++++ b/backend/app/services/k8s_client.py
+@@ -733,6 +733,24 @@ class K8sClient:
+         item = self._crd_body(item)
+         return [item.to_dict() if hasattr(item, "to_dict") else item]
+ 
++    def list_resource_quotas(self, namespace: str | None) -> list[dict[str, Any]]:
++        """ResourceQuota list in the standard kubernetes dict form
++        (``to_dict``) for one namespace, or across all namespaces when the
++        namespace is ``None`` (the ``list_secrets`` branch). No field
++        stripping — the view renders ``status.used``/``status.hard`` and the
++        data page the full object. A transport ApiException maps to
++        ``ClusterUnreachableError`` (502)."""
++        try:
++            resp = (
++                self._v1.list_namespaced_resource_quota(namespace)
++                if namespace
++                else self._v1.list_resource_quota_for_all_namespaces()
++            )
++        except ApiException as e:
++            self._unreachable("list_resource_quotas", e)
++            raise AssertionError("unreachable") from e
++        return [q.to_dict() for q in resp.items]
++
+     def list_secrets(self, namespace: str | None) -> list[dict[str, Any]]:
+         """Secret list in the standard kubernetes dict form (``to_dict``)
+         without ``data``/``string_data``: values are read one secret at a
+@@ -759,6 +777,18 @@ class K8sClient:
+                 return []
+             raise
+ 
++    def get_resource_quota(self, namespace: str, name: str) -> list[dict[str, Any]]:
++        """One ResourceQuota as a 0/1-item list; ``[]`` on 404. Any other
++        ApiException maps to ``ClusterUnreachableError`` (502), matching
++        ``get_secret``'s transport contract."""
++        try:
++            return [self._v1.read_namespaced_resource_quota(name, namespace).to_dict()]
++        except ApiException as e:
++            if e.status == 404:
++                return []
++            self._unreachable("get_resource_quota", e)
++            raise AssertionError("unreachable") from e
++
+     def list_network_policies(self, namespace: str | None) -> list[dict[str, Any]]:
+         """NetworkPolicy list in the standard kubernetes dict form (``to_dict``).
+         No field stripping — a policy's spec is what the view renders. A
+diff --git a/backend/tests/api/test_resources.py b/backend/tests/api/test_resources.py
+index b9130c26..30dfea85 100644
+--- a/backend/tests/api/test_resources.py
++++ b/backend/tests/api/test_resources.py
+@@ -341,6 +341,58 @@ class FakeK8s:
+             return self.list_runtime_classes(None)
+         return []
+ 
++    def list_resource_quotas(self, namespace: str | None) -> list[dict]:
++        # Namespaced kind (core): the namespace is forwarded (the real
++        # K8sClient.list_resource_quotas pattern). The all-namespaces branch is
++        # DISTINCTLY named (team-b) so the API tests can tell the branches
++        # apart, mirroring list_network_policies.
++        if namespace is None:
++            return [
++                {
++                    "metadata": {"name": "compute", "namespace": "team-b"},
++                    "status": {"used": {"pods": "1"}, "hard": {"pods": "10"}},
++                },
++            ]
++        return [
++            {
++                "metadata": {
++                    "name": "compute",
++                    "namespace": namespace or "team-a",
++                    "creation_timestamp": "2026-01-02T03:04:05Z",
++                    "labels": {"team": "a"},
++                    "annotations": {"quota.kubernetes.io/managed-by": "kubedash"},
++                },
++                "spec": {
++                    "hard": {
++                        "requests.cpu": "4",
++                        "requests.memory": "10Gi",
++                        "limits.cpu": "8",
++                        "limits.memory": "20Gi",
++                    },
++                    "scopes": ["NotBestEffort"],
++                },
++                "status": {
++                    "hard": {
++                        "requests.cpu": "4",
++                        "requests.memory": "10Gi",
++                        "limits.cpu": "8",
++                        "limits.memory": "20Gi",
++                    },
++                    "used": {
++                        "requests.cpu": "2",
++                        "requests.memory": "4Gi",
++                        "limits.cpu": "4",
++                        "limits.memory": "8Gi",
++                    },
++                },
++            }
++        ]
++
++    def get_resource_quota(self, namespace: str, name: str) -> list[dict]:
++        if name == "compute":
++            return self.list_resource_quotas(namespace)
++        return []
++
+     def readyz(self) -> bool:
+         return True
+ 
+@@ -1456,6 +1508,111 @@ def test_runtimeclass_kind_singular_rejected(api_client, auth_client) -> None:
+     assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
+ 
+ 
++def test_list_resourcequotas_200_in_namespace(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[resourcequotas-list-200-in-namespace] a bound user listing
++    resourcequotas?namespace=team-a gets the to_dict items back, and the
++    namespace is forwarded to the client (namespaced core kind)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h
++    )
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "resourcequotas"
++    assert body["cluster"] == "prod"
++    [item] = body["items"]
++    assert item["metadata"]["name"] == "compute"
++    assert item["metadata"]["namespace"] == "team-a"
++    assert item["status"]["used"]["requests.cpu"] == "2"
++    assert item["status"]["hard"]["limits.memory"] == "20Gi"
++
++
++def test_list_resourcequotas_all_namespaces_without_param(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[resourcequotas-list-all-namespaces-without-param] no namespace query
++    hits the all-namespaces branch: the FakeK8s receives None and the
++    distinctly-named team-b item is present."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get("/api/v1/clusters/1/resources/resourcequotas", headers=h)
++    assert r.status_code == 200
++    body = r.get_json()
++    assert body["kind"] == "resourcequotas"
++    assert [item["metadata"]["namespace"] for item in body["items"]] == ["team-b"]
++
++
++def test_list_resourcequotas_get_by_name(
++    api_client, auth_client, fake_k8s, monkeypatch
++) -> None:
++    """[resourcequotas-get-by-name] ?name= returns a 0/1-item list: a hit
++    returns the one item in team-a, a miss returns [] (mirrors get_secret)."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    _allow_sar(monkeypatch)
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/resourcequotas?name=compute&namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    [item] = r.get_json()["items"]
++    assert item["metadata"]["name"] == "compute"
++    assert item["metadata"]["namespace"] == "team-a"
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/resourcequotas?name=ghost&namespace=team-a",
++        headers=h,
++    )
++    assert r.status_code == 200
++    assert r.get_json()["items"] == []
++
++
++def test_list_resourcequotas_sar_denied(api_client, auth_client, fake_k8s, monkeypatch) -> None:
++    """[resourcequotas-sar-denied] ADR-0004: the SAR is asked BEFORE the
++    read, with the core group (empty string) and the query namespace — a
++    deny short-circuits to 403 RBAC_DENIED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    asked = _record_sar(monkeypatch)  # denies every SAR and records calls
++    r = api_client.get(
++        "/api/v1/clusters/1/resources/resourcequotas?namespace=team-a", headers=h
++    )
++    assert r.status_code == 403
++    assert r.get_json()["error"]["code"] == "RBAC_DENIED"
++    assert ("list", "resourcequotas", "team-a", None, "") in asked
++
++
++def test_resourcequotas_binding_404(api_client, auth_client) -> None:
++    """[resourcequotas-binding-404] an unbound user: the binding gate fails
++    before the SAR, CLUSTER_NOT_FOUND."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    r = api_client.get(
++        "/api/v1/clusters/999/resources/resourcequotas?namespace=team-a", headers=h
++    )
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "CLUSTER_NOT_FOUND"
++
++
++def test_resourcequota_kind_singular_rejected(api_client, auth_client) -> None:
++    """[resourcequota-kind-singular-rejected] the 4.1 route name (singular)
++    is not a kind — RESOURCE_KIND_NOT_SUPPORTED."""
++    auth_client.login()
++    h = {"Authorization": f"Bearer {auth_client.jwt}"}
++    _register(api_client, h)
++    r = api_client.get("/api/v1/clusters/1/resources/resourcequota", headers=h)
++    assert r.status_code == 404
++    assert r.get_json()["error"]["code"] == "RESOURCE_KIND_NOT_SUPPORTED"
++
++
+ @pytest.mark.integration
+ def test_list_pods_on_kind(api_client, auth_client, kind_client) -> None:
+     cid, kubeconfig = kind_client
+diff --git a/backend/tests/services/test_k8s_client_resourcequotas.py b/backend/tests/services/test_k8s_client_resourcequotas.py
+new file mode 100644
+index 00000000..3cc52a95
+--- /dev/null
++++ b/backend/tests/services/test_k8s_client_resourcequotas.py
+@@ -0,0 +1,88 @@
++from types import SimpleNamespace
++
++import pytest
++from kubernetes.client.exceptions import ApiException
++
++from app.core.errors import ClusterUnreachableError
++from app.services.k8s_client import K8sClient
++
++
++def _client(v1: object) -> K8sClient:
++    client = object.__new__(K8sClient)
++    client._v1 = v1
++    return client
++
++
++def test_list_resource_quotas_in_namespace() -> None:
++    """[resourcequotas-list-200-in-namespace] a namespace is forwarded to
++    ``list_namespaced_resource_quota`` (the ``list_secrets`` pattern)."""
++    seen: list[object] = []
++    item = SimpleNamespace(
++        to_dict=lambda: {
++            "metadata": {"name": "compute", "namespace": "team-a"},
++            "status": {
++                "hard": {"requests.cpu": "4", "limits.memory": "20Gi"},
++                "used": {"requests.cpu": "2", "limits.memory": "8Gi"},
++            },
++        }
++    )
++    v1 = SimpleNamespace(
++        list_namespaced_resource_quota=lambda namespace: (
++            seen.append(namespace),
++            SimpleNamespace(items=[item]),
++        )[1],
++    )
++    result = _client(v1).list_resource_quotas("team-a")
++    assert result[0]["metadata"]["namespace"] == "team-a"
++    assert seen == ["team-a"]  # the namespace is forwarded, not dropped
++
++
++def test_list_resource_quotas_all_namespaces_without_namespace() -> None:
++    """[resourcequotas-list-all-namespaces-without-param] ``None`` uses
++    the all-namespaces call (the ``list_secrets`` branch)."""
++    seen: list[object] = []
++    v1 = SimpleNamespace(
++        list_resource_quota_for_all_namespaces=lambda: (
++            seen.append(True),
++            SimpleNamespace(items=[]),
++        )[1],
++    )
++    assert _client(v1).list_resource_quotas(None) == []
++    assert seen == [True]
++
++
++def test_list_resource_quotas_maps_500_to_unreachable() -> None:
++    def list_all(namespace: str) -> None:
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(list_namespaced_resource_quota=list_all)).list_resource_quotas("team-a")
++
++
++def test_get_resource_quota_404_returns_empty_list() -> None:
++    """[resourcequotas-get-by-name] a miss is ``[]``, mirroring
++    ``get_secret``'s 0/1-item contract."""
++
++    def read(name: str, namespace: str) -> None:
++        raise ApiException(status=404)
++
++    v1 = SimpleNamespace(read_namespaced_resource_quota=read)
++    assert _client(v1).get_resource_quota("team-a", "ghost") == []
++
++
++def test_get_resource_quota_hit_returns_one_item() -> None:
++    item = SimpleNamespace(to_dict=lambda: {"metadata": {"name": "compute"}})
++    v1 = SimpleNamespace(read_namespaced_resource_quota=lambda name, namespace: item)
++    assert _client(v1).get_resource_quota("team-a", "compute") == [
++        {"metadata": {"name": "compute"}}
++    ]
++
++
++def test_get_resource_quota_other_api_error_maps_to_unreachable() -> None:
++    def read(name: str, namespace: str) -> None:
++        raise ApiException(status=500)
++
++    with pytest.raises(ClusterUnreachableError):
++        _client(SimpleNamespace(read_namespaced_resource_quota=read)).get_resource_quota(
++            "team-a", "compute"
++        )
+
+diff --git a/frontend/src/lib/types.ts b/frontend/src/lib/types.ts
+index 5f096445..e6ed4242 100644
+--- a/frontend/src/lib/types.ts
++++ b/frontend/src/lib/types.ts
+@@ -255,6 +255,27 @@ export interface RuntimeClassItem {
+   [key: string]: unknown
+ }
+ 
++/** A ResourceQuota item as returned by /api/v1/clusters/<id>/resources/resourcequotas (kubernetes to_dict, snake_case; namespaced, core group). */
++export interface ResourceQuotaItem {
++  metadata?: {
++    name?: string
++    namespace?: string
++    creation_timestamp?: string
++    labels?: Record<string, string>
++    annotations?: Record<string, string>
++  }
++  spec?: {
++    hard?: Record<string, string>
++    scopes?: string[]
++    scope_selector?: unknown
++  }
++  status?: {
++    hard?: Record<string, string>
++    used?: Record<string, string>
++  }
++  [key: string]: unknown
++}
++
+ /** Closed set for the detail page's ?kind= param (4.1 parity). */
+ export const POLICY_KINDS = ['NetworkPolicy', 'CiliumNetworkPolicy', 'CiliumClusterwideNetworkPolicy'] as const
+ export type PolicyKind = (typeof POLICY_KINDS)[number]
+diff --git a/frontend/src/views/OtherResource/ResourceQuota.tsx b/frontend/src/views/OtherResource/ResourceQuota.tsx
+new file mode 100644
+index 00000000..6e3a7cc4
+--- /dev/null
++++ b/frontend/src/views/OtherResource/ResourceQuota.tsx
+@@ -0,0 +1,132 @@
++import React from 'react'
++import { Link } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { apiFetch } from '../../lib/api'
++import { formatTimestamp } from '../../lib/format'
++import type { ResourceList, ResourceQuotaItem } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import KubeDataTable, { Column } from '../../components/KubeDataTable'
++import TopMenu from '../../components/TopMenu'
++
++type QuotaRow = {
++  name: string
++  namespace: string
++  requests: string[]
++  limits: string[]
++  created: string
++}
++
++// 4.1's four dimensions, 4.1's order. A key missing from status.used or
++// status.hard renders "—" (certainty rule: 4.1 would KeyError the template;
++// 5.0 renders certainty, never guesses).
++const cell = (item: ResourceQuotaItem, key: string): string => {
++  const used = item.status?.used?.[key] ?? '—'
++  const hard = item.status?.hard?.[key] ?? '—'
++  return `${key}: ${used} / ${hard}`
++}
++
++const toRow = (item: ResourceQuotaItem, namespace: string): QuotaRow => ({
++  name: item.metadata?.name ?? '',
++  // the row's OWN namespace: an all-namespaces list would carry mixed
++  // namespaces, and the name link must follow the row, not the store.
++  namespace: item.metadata?.namespace ?? namespace,
++  requests: [cell(item, 'requests.cpu'), cell(item, 'requests.memory')],
++  limits: [cell(item, 'limits.cpu'), cell(item, 'limits.memory')],
++  created: formatTimestamp(item.metadata?.creation_timestamp),
++})
++
++// The Requests/Limits cells: one line per dimension (4.1's badge pairs),
++// joined by <br/> in the table cell.
++const dimensionCell = (cells: string[]) =>
++  cells.map((c, i) => (
++    <React.Fragment key={i}>
++      {c}
++      {i < cells.length - 1 && <br />}
++    </React.Fragment>
++  ))
++
++const nameLink = (row: QuotaRow) =>
++  row.name ? (
++    <Link
++      to={`/other-resource/resource-quota/data?name=${encodeURIComponent(row.name)}&namespace=${encodeURIComponent(row.namespace)}`}
++    >
++      {row.name}
++    </Link>
++  ) : null
++
++/**
++ * 4.1 `other-resources/resource-quota.html.j2`: ResourceQuotas in the
++ * header-selected namespace (the NetworkPolicy pattern — the namespace comes
++ * from the selected-namespace store, `?? 'default'`; 4.1's `session['ns_select']`
++ * hidden form is the ratified `?name=&namespace=` delta, briefing.md). A name
++ * opens the quota data page — this list view is the SOLE producer of those
++ * `?name=&namespace=` query strings. The card title is EXACTLY "Resource
++ * Quota List": the e2e smoke (ui-smoke.spec.ts) asserts that string with
++ * exact: true. Request/Limit cells show the four 4.1 dimensions as
++ * `used / hard`; a missing key renders "—" (certainty rule).
++ */
++const ResourceQuotaView = () => {
++  const cluster = useClusterStore((s) => s.selectedCluster)
++  const namespace = useClusterStore((s) => s.selectedNamespace) ?? 'default'
++
++  const query = useQuery<QuotaRow[]>({
++    queryKey: ['resourcequotas', cluster?.id, namespace],
++    enabled: cluster != null,
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<ResourceQuotaItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/resourcequotas?namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      return (r.data?.items ?? []).map((item) => toRow(item, namespace))
++    },
++  })
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem active>Resource Quota List</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">Resource Quota List</CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading resource quotas...</div>
++        ) : query.error ? (
++          <div className="text-danger">Error loading resource quotas: {query.error.message}</div>
++        ) : (query.data ?? []).length === 0 ? (
++          <div className="text-center text-muted">No resource quotas found</div>
++        ) : (
++          <KubeDataTable data={query.data ?? []}>
++            <Column title="Name" data={null}>
++              {nameLink}
++            </Column>
++            <Column title="Namespace" data="namespace" />
++            <Column title="Requests" data="requests">
++              {(cells: string[]) => dimensionCell(cells)}
++            </Column>
++            <Column title="Limits" data="limits">
++              {(cells: string[]) => dimensionCell(cells)}
++            </Column>
++            <Column title="Created" data="created" />
++          </KubeDataTable>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default ResourceQuotaView
+diff --git a/frontend/tests/views/resource_quotas.test.tsx b/frontend/tests/views/resource_quotas.test.tsx
+new file mode 100644
+index 00000000..09e1d403
+--- /dev/null
++++ b/frontend/tests/views/resource_quotas.test.tsx
+@@ -0,0 +1,279 @@
++import { render, screen } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test, vi } from 'vitest'
++import { server } from '../msw'
++import ResourceQuotaView from '../../src/views/OtherResource/ResourceQuota'
++import { useClusterStore } from '../../src/store/cluster'
++
++// Same KubeDataTable fake as network_policies.test.tsx: renders the real row
++// mapping (children-as-render-fns included) so cell assertions test the
++// view's `toRow` output, not DataTables' DOM. The factory is async: a
++// hoisted mock may not touch module-scope consts, so react is imported
++// inline (`vi.mock` calls are hoisted above the imports below).
++vi.mock('../../src/components/KubeDataTable', async () => {
++  const React = (await import('react')) as typeof import('react')
++  const Column = () => null
++  function KubeDataTable({
++    data,
++    children,
++  }: {
++    data: Record<string, unknown>[]
++    children: React.ReactNode
++  }) {
++    const cols = React.Children.toArray(children)
++      .filter(React.isValidElement)
++      .map(
++        (child) =>
++          (
++            child as React.ReactElement<{
++              title: string
++              data: string | null
++              children?: unknown
++            }>
++          ).props,
++      )
++    return (
++      <table>
++        <thead>
++          <tr>
++            {cols.map((col) => (
++              <th key={col.title}>{col.title}</th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {data.map((row, i) => (
++            <tr key={i}>
++              {cols.map((col) => {
++                const value = col.data === null ? row : row[col.data]
++                const node =
++                  typeof col.children === 'function'
++                    ? // datatables.net-react slotRenderer: a 2-arg slot fn
++                      // receives (data, row); 1-arg fns get the data value.
++                      (col.children as (v: unknown, r: unknown) => React.ReactNode)(
++                        value,
++                        row,
++                      )
++                    : (value as React.ReactNode)
++                return <td key={col.title}>{node ?? ''}</td>
++              })}
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    )
++  }
++  return { default: KubeDataTable, Column }
++})
++
++const renderAt = (ui: ReactElement, path = '/other-resource/resource-quota') => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// kubernetes to_dict shape: snake_case, all four 4.1 dimensions present.
++const compute = {
++  apiVersion: 'v1',
++  kind: 'ResourceQuota',
++  metadata: {
++    name: 'compute',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-02T03:04:05Z',
++    labels: { team: 'a' },
++    annotations: { 'quota.kubernetes.io/managed-by': 'kubedash' },
++  },
++  spec: {
++    hard: {
++      'requests.cpu': '4',
++      'requests.memory': '10Gi',
++      'limits.cpu': '8',
++      'limits.memory': '20Gi',
++    },
++    scopes: ['NotBestEffort'],
++  },
++  status: {
++    hard: {
++      'requests.cpu': '4',
++      'requests.memory': '10Gi',
++      'limits.cpu': '8',
++      'limits.memory': '20Gi',
++    },
++    used: {
++      'requests.cpu': '2',
++      'requests.memory': '4Gi',
++      'limits.cpu': '4',
++      'limits.memory': '8Gi',
++    },
++  },
++}
++
++// No cpu/memory keys in status (an object-count quota): every 4.1
++// dimension is missing (the 4.1 template would KeyError).
++const objects = {
++  apiVersion: 'v1',
++  kind: 'ResourceQuota',
++  metadata: {
++    name: 'objects',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-03T04:05:06Z',
++    labels: {},
++    annotations: {},
++  },
++  spec: {
++    hard: { pods: '20' },
++  },
++  status: {
++    hard: { pods: '20' },
++    used: { pods: '10' },
++  },
++}
++
++// list-renders-rows-with-data-links
++test('list-renders-resource-quotas-with-data-links', async () => {
++  let requestedPath = ''
++  let requestedNs = ''
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', ({ request }) => {
++      const u = new URL(request.url)
++      requestedPath = u.pathname
++      requestedNs = u.searchParams.get('namespace') ?? ''
++      return HttpResponse.json({
++        kind: 'resourcequotas',
++        cluster: 'prod',
++        items: [compute],
++      })
++    }),
++  )
++  selectProd()
++  renderAt(<ResourceQuotaView />)
++
++  const link = await screen.findByRole('link', { name: 'compute' })
++  // the list view is the sole producer of the data page's query strings.
++  expect(link.getAttribute('href')).toBe(
++    '/other-resource/resource-quota/data?name=compute&namespace=team-a',
++  )
++  // the namespaced fetch EXACTLY: cluster path + the header's namespace.
++  expect(requestedPath).toBe('/api/v1/clusters/1/resources/resourcequotas')
++  expect(requestedNs).toBe('team-a')
++  // card title: EXACT string (the e2e smoke asserts it with exact: true).
++  expect(screen.getAllByText('Resource Quota List', { exact: true }).length).toBeGreaterThanOrEqual(1)
++  // breadcrumb: Other Resources → Resource Quota List.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  // columns: name, namespace, request/limit badge pairs, created.
++  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
++    'Name',
++    'Namespace',
++    'Requests',
++    'Limits',
++    'Created',
++  ])
++  const nameCell = link.closest('tr')
++  // row: the namespace is shown (the namespaced kind).
++  expect(nameCell?.textContent).toContain('team-a')
++  // created: local time (no raw ISO 'T'), rendered by formatTimestamp.
++  expect(nameCell?.textContent).not.toContain('2026-01-02T03:04:05Z')
++  expect(nameCell?.textContent).toMatch(/2026/)
++})
++
++// list-request-limit-cells
++test('list-request-limit-cells', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
++      HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [compute] }),
++    ),
++  )
++  selectProd()
++  renderAt(<ResourceQuotaView />)
++
++  const nameCell = (await screen.findByRole('link', { name: 'compute' })).closest('tr')
++  // 4.1's badge pairs: `<key>: <used> / <hard>`, one line per dimension.
++  expect(nameCell?.textContent).toContain('requests.cpu: 2 / 4')
++  expect(nameCell?.textContent).toContain('requests.memory: 4Gi / 10Gi')
++  expect(nameCell?.textContent).toContain('limits.cpu: 4 / 8')
++  expect(nameCell?.textContent).toContain('limits.memory: 8Gi / 20Gi')
++})
++
++// list-missing-status-keys
++test('list-missing-status-keys', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
++      HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [objects] }),
++    ),
++  )
++  selectProd()
++  renderAt(<ResourceQuotaView />)
++
++  const nameCell = (await screen.findByRole('link', { name: 'objects' })).closest('tr')
++  // certainty rule: a key missing from status.used or status.hard renders
++  // "—" — 4.1 would KeyError the template; 5.0 never guesses.
++  expect(nameCell?.textContent).toContain('limits.cpu: — / —')
++  expect(nameCell?.textContent).toContain('requests.memory: — / —')
++  expect(nameCell?.textContent).not.toContain('undefined')
++})
++
++// list-no-cluster-state
++test('list-no-cluster-state', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++  renderAt(<ResourceQuotaView />)
++
++  expect(await screen.findByText('No cluster selected.')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no resource fetch is made
++})
++
++// list-error-state
++test('list-error-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
++      HttpResponse.json(
++        { error: { code: 'RBAC_DENIED', message: 'list on resourcequotas' } },
++        { status: 403 },
++      ),
++    ),
++  )
++  selectProd()
++  renderAt(<ResourceQuotaView />)
++
++  expect(
++    await screen.findByText(/Error loading resource quotas: RBAC_DENIED: list on resourcequotas/),
++  ).toBeTruthy()
++  // no blank table, no rows.
++  expect(screen.queryAllByRole('link', { name: 'compute' })).toHaveLength(0)
++})
++
++// list-empty-state
++test('list-empty-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
++      HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [] }),
++    ),
++  )
++  selectProd()
++  renderAt(<ResourceQuotaView />)
++
++  // first-class empty state, not an error.
++  expect(await screen.findByText('No resource quotas found')).toBeTruthy()
++})
+
+diff --git a/frontend/src/views/OtherResource/ResourceQuotaData.tsx b/frontend/src/views/OtherResource/ResourceQuotaData.tsx
+new file mode 100644
+index 00000000..fd5069a5
+--- /dev/null
++++ b/frontend/src/views/OtherResource/ResourceQuotaData.tsx
+@@ -0,0 +1,213 @@
++import React from 'react'
++import { Link, useSearchParams } from 'react-router-dom'
++import {
++  CBreadcrumb,
++  CBreadcrumbItem,
++  CCard,
++  CCardBody,
++  CCardHeader,
++  CCardTitle,
++  CTable,
++} from '@coreui/react'
++import { useQuery } from '@tanstack/react-query'
++import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
++import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json'
++import anOldHope from 'react-syntax-highlighter/dist/esm/styles/hljs/an-old-hope'
++import { apiFetch } from '../../lib/api'
++import { formatTimestamp } from '../../lib/format'
++import type { ResourceList, ResourceQuotaItem } from '../../lib/types'
++import { useClusterStore } from '../../store/cluster'
++import TopMenu from '../../components/TopMenu'
++
++// Same pattern as SecretData.tsx / NetworkPolicyData.tsx: the hljs language
++// module is a singleton, so a second registration is harmless. Register
++// `json` — the block is `JSON.stringify` of the to_dict object (a YAML
++// subset), so the json grammar is the truthful classifier for the exact text
++// rendered (ratified rule, PriorityClassData final review 2026-10-28).
++SyntaxHighlighter.registerLanguage('json', json)
++
++const NOT_FOUND = 'not found'
++
++// The four 4.1 quota dimensions, in 4.1's order. A key missing from
++// status.used or status.hard renders "—" (certainty rule: 4.1's template
++// would KeyError here; 5.0 renders certainty, never guesses).
++const STATUS_DIMENSIONS = ['limits.cpu', 'limits.memory', 'requests.cpu', 'requests.memory'] as const
++
++/**
++ * 4.1 `other-resources/resource-quota-data.html.j2` parity: one
++ * ResourceQuota's metadata (name, created, namespace, scopes, labels,
++ * annotations) plus a used-vs-hard Status table over the four 4.1 dimensions,
++ * plus the full object as a syntax-highlighted JSON block. The read is a
++ * SINGLE `?name=&namespace=` fetch (not 4.1's list-then-filter); empty
++ * `items` is a not-found STATE (pinned copy), not an error. 4.1 deviations
++ * (recorded in the change's adr.md): no Selectors table (the raw
++ * `spec.scope_selector` stays in the JSON block), no `trimAnnotations`
++ * (annotations render verbatim), and 4.1's duplicate `Creation` row is
++ * collapsed into the single `Created` row. The list view's name links are
++ * the sole producer of these query strings.
++ */
++const ResourceQuotaDataView = () => {
++  const [params] = useSearchParams()
++  const name = params.get('name') ?? ''
++  const namespace = params.get('namespace') ?? ''
++  const cluster = useClusterStore((s) => s.selectedCluster)
++
++  const query = useQuery<ResourceQuotaItem>({
++    queryKey: ['resource-quota-data', cluster?.id, namespace, name],
++    enabled: cluster != null && name !== '' && namespace !== '',
++    queryFn: async () => {
++      const r = await apiFetch<ResourceList<ResourceQuotaItem>>(
++        `/api/v1/clusters/${cluster!.id}/resources/resourcequotas?name=${encodeURIComponent(name)}&namespace=${encodeURIComponent(namespace)}`,
++      )
++      if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`)
++      const [item] = r.data?.items ?? []
++      if (!item) throw new Error(NOT_FOUND)
++      return item
++    },
++  })
++
++  const item = query.data
++  const labels = Object.entries(item?.metadata?.labels ?? {})
++  const annotations = Object.entries(item?.metadata?.annotations ?? {})
++
++  return (
++    <CCard className="shadow mb-4">
++      <TopMenu>
++        <CBreadcrumb className="my-0" aria-label="breadcrumb">
++          <CBreadcrumbItem>Other Resources</CBreadcrumbItem>
++          <CBreadcrumbItem>
++            <Link to="/other-resource/resource-quota">Resource Quota List</Link>
++          </CBreadcrumbItem>
++          <CBreadcrumbItem active>{name || 'Error'}</CBreadcrumbItem>
++        </CBreadcrumb>
++      </TopMenu>
++      <CCardHeader className="py-3">
++        <CCardTitle className="m-0 fw-bold text-primary fs-6">Resource Quota Data</CCardTitle>
++      </CCardHeader>
++      <CCardBody>
++        {!name ? (
++          <div className="text-danger">Error: resource quota name not provided</div>
++        ) : !cluster ? (
++          <div>No cluster selected.</div>
++        ) : query.isLoading ? (
++          <div>Loading resource quota data...</div>
++        ) : query.error ? (
++          query.error.message === NOT_FOUND ? (
++            <div className="text-center text-muted">No ResourceQuota '{name}' found</div>
++          ) : (
++            <div className="text-danger">Error loading resource quota: {query.error.message}</div>
++          )
++        ) : (
++          <>
++            <CTable bordered>
++              <tbody>
++                <tr>
++                  <th scope="row">Name:</th>
++                  <td>{item?.metadata?.name ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Created:</th>
++                  <td>{formatTimestamp(item?.metadata?.creation_timestamp) || 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Namespace:</th>
++                  <td>{item?.metadata?.namespace ?? 'N/A'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Scope:</th>
++                  <td>{item?.spec?.scopes?.join(', ') || '—'}</td>
++                </tr>
++                <tr>
++                  <th scope="row">Labels:</th>
++                  <td>
++                    {labels.length === 0 ? (
++                      'No labels'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {labels.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++                <tr>
++                  <th scope="row">Annotations:</th>
++                  <td>
++                    {annotations.length === 0 ? (
++                      'No annotations'
++                    ) : (
++                      <CTable bordered small className="mb-0">
++                        <thead>
++                          <tr>
++                            <th>Key</th>
++                            <th>Value</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {annotations.map(([key, value]) => (
++                            <tr key={key}>
++                              <td>{key}</td>
++                              <td className="text-break">{value}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </CTable>
++                    )}
++                  </td>
++                </tr>
++              </tbody>
++            </CTable>
++            <CTable bordered className="mb-4">
++              <thead>
++                <tr>
++                  <th>Resource</th>
++                  <th>Used</th>
++                  <th>Hard Limit</th>
++                </tr>
++              </thead>
++              <tbody>
++                {STATUS_DIMENSIONS.map((dim) => (
++                  <tr key={dim}>
++                    <td>{dim}</td>
++                    <td>{item?.status?.used?.[dim] ?? '—'}</td>
++                    <td>{item?.status?.hard?.[dim] ?? '—'}</td>
++                  </tr>
++                ))}
++              </tbody>
++            </CTable>
++            <CCard className="mb-0">
++              <CCardHeader className="py-2">
++                <CCardTitle className="m-0 fw-bold text-primary fs-6">Resource Quota</CCardTitle>
++              </CCardHeader>
++              <CCardBody>
++                <SyntaxHighlighter
++                  language="json"
++                  style={anOldHope}
++                  wrapLongLines
++                  customStyle={{ margin: 0 }}
++                  codeTagProps={{ style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
++                >
++                  {JSON.stringify(item, null, 2)}
++                </SyntaxHighlighter>
++              </CCardBody>
++            </CCard>
++          </>
++        )}
++      </CCardBody>
++    </CCard>
++  )
++}
++
++export default ResourceQuotaDataView
+diff --git a/frontend/tests/views/resource_quota_data.test.tsx b/frontend/tests/views/resource_quota_data.test.tsx
+new file mode 100644
+index 00000000..e79c4a45
+--- /dev/null
++++ b/frontend/tests/views/resource_quota_data.test.tsx
+@@ -0,0 +1,208 @@
++import { render, screen, waitFor } from '@testing-library/react'
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router-dom'
++import { http, HttpResponse, type AnyHandler } from 'msw'
++import type { ReactElement } from 'react'
++import { afterEach, expect, test } from 'vitest'
++import { server } from '../msw'
++import ResourceQuotaDataView from '../../src/views/OtherResource/ResourceQuotaData'
++import { useClusterStore } from '../../src/store/cluster'
++
++const renderAt = (ui: ReactElement, path: string) => {
++  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
++  return render(
++    <QueryClientProvider client={qc}>
++      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
++    </QueryClientProvider>,
++  )
++}
++
++afterEach(() => {
++  useClusterStore.setState({ selectedCluster: null, selectedNamespace: null })
++})
++
++const selectProd = () =>
++  useClusterStore.setState({
++    selectedCluster: { id: 1, name: 'prod' },
++    selectedNamespace: 'team-a',
++  })
++
++// kubernetes to_dict shape: snake_case, namespaced, all four 4.1 dimensions.
++const compute = {
++  apiVersion: 'v1',
++  kind: 'ResourceQuota',
++  metadata: {
++    name: 'compute',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-02T03:04:05Z',
++    labels: { team: 'a' },
++    annotations: { 'quota.kubernetes.io/managed-by': 'kubedash' },
++  },
++  spec: {
++    hard: {
++      'requests.cpu': '4',
++      'requests.memory': '10Gi',
++      'limits.cpu': '8',
++      'limits.memory': '20Gi',
++    },
++    scopes: ['NotBestEffort'],
++  },
++  status: {
++    hard: {
++      'requests.cpu': '4',
++      'requests.memory': '10Gi',
++      'limits.cpu': '8',
++      'limits.memory': '20Gi',
++    },
++    used: {
++      'requests.cpu': '2',
++      'requests.memory': '4Gi',
++      'limits.cpu': '4',
++      'limits.memory': '8Gi',
++    },
++  },
++}
++
++// A pods-only quota: none of the four cpu/memory dimensions present in
++// status (4.1's template would KeyError here).
++const podsOnly = {
++  apiVersion: 'v1',
++  kind: 'ResourceQuota',
++  metadata: {
++    name: 'objects',
++    namespace: 'team-a',
++    creation_timestamp: '2026-01-03T04:05:06Z',
++    labels: {},
++    annotations: {},
++  },
++  spec: { hard: { pods: '20' } },
++  status: { hard: { pods: '20' }, used: { pods: '10' } },
++}
++
++// resourcequota-data-renders-detail
++test('data-renders-detail', async () => {
++  let fetchCount = 0
++  const handlers: AnyHandler[] = [
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', ({ request }) => {
++      fetchCount++
++      const u = new URL(request.url)
++      if (u.searchParams.get('name') !== 'compute' || u.searchParams.get('namespace') !== 'team-a') {
++        return HttpResponse.json({ error: { code: 'UNEXPECTED', message: u.href } }, { status: 500 })
++      }
++      return HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [compute] })
++    }),
++  ]
++  server.use(...handlers)
++  selectProd()
++  const { container } = renderAt(
++    <ResourceQuotaDataView />,
++    '/other-resource/resource-quota/data?name=compute&namespace=team-a',
++  )
++
++  // Wait for the fetch to land (the highlighter splits tokens across spans,
++  // so poll the DOM text instead of findByText on a token).
++  await waitFor(() => {
++    expect(container.textContent).toContain('NotBestEffort')
++  })
++  // single read: EXACTLY the ?name=&namespace= URL.
++  expect(fetchCount).toBe(1)
++  // card title.
++  expect(screen.getByText('Resource Quota Data')).toBeTruthy()
++  // breadcrumb: Other Resources → Resource Quota List → name.
++  expect(screen.getByText('Other Resources')).toBeTruthy()
++  const listLink = screen.getByRole('link', { name: 'Resource Quota List' })
++  expect(listLink.getAttribute('href')).toBe('/other-resource/resource-quota')
++  // CTable rows: Name / Namespace / Scope / labels / annotations. The same
++  // values repeat in the JSON block below, so scope to a table.
++  const inTable = async (text: string) =>
++    (await screen.findAllByText(text)).some((el) => el.closest('table'))
++  expect(await inTable('compute')).toBe(true)
++  expect(await inTable('team-a')).toBe(true)
++  expect(await inTable('NotBestEffort')).toBe(true)
++  expect(await inTable('team')).toBe(true)
++  expect(await inTable('quota.kubernetes.io/managed-by')).toBe(true)
++  expect(await inTable('kubedash')).toBe(true)
++  // Created: rendered via formatTimestamp — no raw ISO 'T' in the table row.
++  const createdCells = (await screen.findAllByText(/2026/)).filter((el) => el.closest('table'))
++  expect(createdCells.length).toBeGreaterThanOrEqual(1)
++  expect(createdCells[0].textContent).not.toContain('T03:04:05Z')
++  // Status table: the four 4.1 dimensions with used/hard values.
++  expect(await inTable('limits.cpu')).toBe(true)
++  expect(await inTable('requests.memory')).toBe(true)
++  const statusRows = (await screen.findAllByText('8Gi')).filter((el) => el.closest('table'))
++  expect(statusRows.length).toBeGreaterThanOrEqual(1)
++  // the full object is rendered as a JSON-highlighted block (truthful
++  // classifier: the block is JSON.stringify of the to_dict item). The
++  // highlighter splits tokens across spans, so poll the DOM text — the
++  // "scopes" key is unique to the JSON block (the CTable says "Scope").
++  await waitFor(() => {
++    expect(container.textContent).toContain('"scopes"')
++  })
++  expect(container.textContent).toContain('NotBestEffort')
++  expect(container.querySelector('pre')).not.toBeNull()
++})
++
++// resourcequota-data-missing-status-keys
++test('data-missing-status-keys', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
++      HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [podsOnly] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <ResourceQuotaDataView />,
++    '/other-resource/resource-quota/data?name=objects&namespace=team-a',
++  )
++
++  await waitFor(() => {
++    expect(container.textContent).toContain('Hard Limit')
++  })
++  // certainty rule: a key missing from status.used or status.hard renders
++  // "—" — 4.1 would KeyError the template; 5.0 never guesses (no throw,
++  // no blank, no "undefined").
++  const statusTable = Array.from(document.querySelectorAll('table')).find((t) =>
++    t.textContent?.includes('Hard Limit'),
++  )
++  expect(statusTable).toBeTruthy()
++  const rows = Array.from(statusTable!.querySelectorAll('tbody tr'))
++  const dims = rows.map((r) => r.textContent)
++  expect(dims.some((d) => d?.includes('limits.cpu') && d?.includes('—'))).toBe(true)
++  expect(dims.some((d) => d?.includes('requests.memory') && d?.includes('—'))).toBe(true)
++  expect(container.textContent).not.toContain('undefined')
++})
++
++// resourcequota-data-not-found-state
++test('data-not-found-state', async () => {
++  server.use(
++    http.get('*/api/v1/clusters/1/resources/resourcequotas', () =>
++      HttpResponse.json({ kind: 'resourcequotas', cluster: 'prod', items: [] }),
++    ),
++  )
++  selectProd()
++  const { container } = renderAt(
++    <ResourceQuotaDataView />,
++    '/other-resource/resource-quota/data?name=ghost&namespace=team-a',
++  )
++
++  // empty items upstream is a STATE, not an error: pinned copy, no error
++  // styling.
++  expect(await screen.findByText("No ResourceQuota 'ghost' found")).toBeTruthy()
++  expect(container.querySelector('.text-danger')).toBeNull()
++})
++
++// resourcequota-data-missing-name
++test('data-missing-name', async () => {
++  const seen: string[] = []
++  server.use(
++    http.get('*/api/v1/clusters/:id/resources/*', ({ request }) => {
++      seen.push(new URL(request.url).pathname)
++      return HttpResponse.json({ items: [] })
++    }),
++  )
++  selectProd()
++  renderAt(<ResourceQuotaDataView />, '/other-resource/resource-quota/data')
++
++  expect(await screen.findByText('Error: resource quota name not provided')).toBeTruthy()
++  expect(seen).toHaveLength(0) // no fetch
++})
+
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 86fad0f6..27395bc4 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -48,6 +48,8 @@ const PriorityClassView = React.lazy(() => import('./views/OtherResource/Priorit
+ const PriorityClassDataView = React.lazy(() => import('./views/OtherResource/PriorityClassData'))
+ const RuntimeClassView = React.lazy(() => import('./views/OtherResource/RuntimeClass'))
+ const RuntimeClassDataView = React.lazy(() => import('./views/OtherResource/RuntimeClassData'))
++const ResourceQuotaView = React.lazy(() => import('./views/OtherResource/ResourceQuota'))
++const ResourceQuotaDataView = React.lazy(() => import('./views/OtherResource/ResourceQuotaData'))
+ const GroupsView = React.lazy(() => import('./views/Groups'))
+ const GroupPrivilegesView = React.lazy(() => import('./views/Groups/GroupPrivileges'))
+ const GroupPrivilegeEditView = React.lazy(() => import('./views/Groups/GroupPrivilegeEdit'))
+@@ -397,6 +399,22 @@ const App = () => {
+                         </ProtectedRoute>
+                       }
+                     />
++                    <Route
++                      path="/other-resource/resource-quota"
++                      element={
++                        <ProtectedRoute>
++                          <ResourceQuotaView />
++                        </ProtectedRoute>
++                      }
++                    />
++                    <Route
++                      path="/other-resource/resource-quota/data"
++                      element={
++                        <ProtectedRoute>
++                          <ResourceQuotaDataView />
++                        </ProtectedRoute>
++                      }
++                    />
+                     {stubRoutes.map((route) => (
+                       <Route
+                         key={route.path}
+diff --git a/frontend/src/views/Stub/routes.ts b/frontend/src/views/Stub/routes.ts
+index 52c7350b..0fa44760 100644
+--- a/frontend/src/views/Stub/routes.ts
++++ b/frontend/src/views/Stub/routes.ts
+@@ -23,7 +23,6 @@ export const stubRoutes: StubRoute[] = [
+   { path: '/other-resource/horizontal-pod-autoscaler', title: 'HPAs', admin: false },
+   { path: '/other-resource/vertical-pod-autoscaler', title: 'VPAs', admin: false },
+   { path: '/other-resource/pod-disruption-budget', title: 'Pod Disruption Budget', admin: false },
+-  { path: '/other-resource/resource-quota', title: 'Resource Quota', admin: false },
+   { path: '/other-resource/limit-range', title: 'Limit Range', admin: false },
+   { path: '/settings/sso-config', title: 'Auth Provider', admin: true },
+   { path: '/settings/cluster-status', title: 'HA Status', admin: true },
+diff --git a/frontend/tests/views/Stub.test.tsx b/frontend/tests/views/Stub.test.tsx
+index 387951a2..012820fd 100644
+--- a/frontend/tests/views/Stub.test.tsx
++++ b/frontend/tests/views/Stub.test.tsx
+@@ -50,6 +50,11 @@ function expectedStubs() {
+     '/other-resource/priorityclass',
+     // Real view (2026-10-28-runtimeclass-views, Task 2) — not a stub route.
+     '/other-resource/runtimeclass',
++    // Real view (2026-10-28-resourcequota-views, Task 2) — not a stub route.
++    // The nav leaf targets the list at /other-resource/resource-quota; the
++    // detail is /other-resource/resource-quota/data.
++    '/other-resource/resource-quota',
++    '/other-resource/resource-quota/data',
+   ])
+   const seen = new Map<string, string>()
+   for (const isAdmin of [true, false]) {
+

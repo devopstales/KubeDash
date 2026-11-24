@@ -1,5 +1,62 @@
-.backlogmd-board { display: flex; gap: 12px; overflow-x: auto; }
-.backlogmd-column { min-width: 240px; background: var(--background-secondary); border-radius: 8px; padding: 8px; }
+.backlogmd-board-header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+.backlogmd-board-header .backlogmd-section-title { font-size: 16px; }
+
+.backlogmd-sections { display: flex; flex-direction: column; gap: 14px; }
+.backlogmd-section-header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; flex-wrap: wrap; }
+.backlogmd-section-id { font-family: var(--font-monospace); font-size: 11px; color: var(--text-muted); }
+.backlogmd-section-title { font-size: 14px; font-weight: 600; }
+.backlogmd-section-meta { font-size: 12px; color: var(--text-muted); }
+.backlogmd-section-goal { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.backlogmd-section-actions { margin-left: auto; display: flex; gap: 6px; }
+.backlogmd-section-btn { font-size: 11px; padding: 2px 10px; }
+.backlogmd-chip { font-size: 10px; padding: 1px 8px; border-radius: 8px; background: var(--background-modifier-border); color: var(--text-muted); text-transform: capitalize; }
+.backlogmd-chip-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+
+.backlogmd-milestone-list { display: flex; flex-direction: column; gap: 8px; }
+.backlogmd-milestone-row { border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 8px; }
+.backlogmd-milestone-header { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; cursor: pointer; }
+.backlogmd-milestone-tasks { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); display: flex; flex-direction: column; gap: 4px; }
+.backlogmd-milestone-task { display: flex; gap: 8px; align-items: baseline; }
+.backlogmd-milestone-task .backlogmd-row-title { flex: 1; font-size: 12px; }
+
+.backlogmd-rows { min-height: 10px; }
+.backlogmd-row { display: flex; gap: 8px; align-items: baseline; background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; cursor: grab; }
+.backlogmd-row.blocked { border-left: 3px solid var(--text-error); }
+.backlogmd-row.dragging { opacity: 0.4; }
+.backlogmd-row-title { flex: 1; font-size: 13px; }
+.backlogmd-row-right { display: flex; gap: 6px; align-items: baseline; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.backlogmd-row-status { font-size: 11px; color: var(--text-muted); }
+.backlogmd-assignee { font-size: 11px; color: var(--text-muted); }
+
+.backlogmd-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.backlogmd-project-switcher { min-width: 140px; }
+.backlogmd-milestone-select { min-width: 200px; max-width: 320px; }
+.backlogmd-filter { flex: 1; min-width: 160px; max-width: 360px; }
+.backlogmd-new-task { white-space: nowrap; }
+
+.backlogmd-board { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; }
+.backlogmd-column { min-width: 240px; max-width: 280px; background: var(--background-secondary); border-radius: 8px; padding: 8px; flex-shrink: 0; }
+.backlogmd-column-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.backlogmd-column-title { margin: 4px 0; font-size: 14px; font-weight: 600; }
+.backlogmd-count { color: var(--text-muted); font-size: 12px; background: var(--background-modifier-border); border-radius: 10px; padding: 0 8px; }
+.backlogmd-cards { min-height: 12px; }
+
 .backlogmd-card { background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 8px; margin-bottom: 8px; cursor: grab; }
 .backlogmd-card.blocked { border-left: 3px solid var(--text-error); }
+.backlogmd-card.dragging { opacity: 0.4; }
+.backlogmd-card-top { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+.backlogmd-card-id { font-family: var(--font-monospace); font-size: 11px; color: var(--text-muted); }
+.backlogmd-card-title { font-size: 13px; margin-bottom: 4px; }
+.backlogmd-card-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--text-muted); }
+.backlogmd-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--background-modifier-border); color: var(--text-muted); text-transform: capitalize; }
+.backlogmd-p-high { background: var(--background-modifier-error); color: var(--text-normal); }
+.backlogmd-p-critical { background: var(--background-modifier-error); color: var(--text-normal); }
+.backlogmd-p-medium { background: var(--background-modifier-warning); color: var(--text-normal); }
+.backlogmd-blocked { margin-left: auto; font-size: 12px; }
+.backlogmd-drop-line { height: 3px; border-radius: 2px; background: var(--interactive-accent); margin: 2px 4px; }
+
+.backlogmd-list { display: flex; flex-direction: column; gap: 6px; }
+.backlogmd-list-row { display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
+.backlogmd-status { color: var(--text-muted); white-space: nowrap; }
+.backlogmd-modal-desc { color: var(--text-muted); font-size: 13px; }
 .backlogmd-empty { color: var(--text-muted); font-style: italic; }

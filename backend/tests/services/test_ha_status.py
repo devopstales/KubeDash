@@ -462,8 +462,8 @@ def test_build_report_detected_replicas_win_over_configured(
         ha_status, "probe_node", lambda dsn, rid, timeout_s=3.0, **_kw: node("n1", lock=True)
     )
     client = _FakeAdminClient(
-        _pod_with_rs("local", "kubedash-abc12-def34"),
-        {"spec": {"replicas": 2}},
+        [_pod_with_rs("local", "kubedash-abc12-def34")],
+        [{"spec": {"replicas": 2}}],
     )
 
     report = build_report(
@@ -545,15 +545,15 @@ def test_build_report_failed_probe_reason_carries_member_name(
 
 
 class _FakeAdminClient:
-    def __init__(self, pod: dict | None, dep: dict | None) -> None:
+    def __init__(self, pod: list[dict] | None, dep: list[dict] | None) -> None:
         self._pod = pod
         self._dep = dep
 
-    def get_pod(self, ns: str, name: str) -> dict | None:
-        return self._pod
+    def get_pod(self, ns: str, name: str) -> list[dict]:
+        return self._pod if self._pod is not None else []
 
-    def get_deployment(self, ns: str, name: str) -> dict | None:
-        return self._dep
+    def get_deployment(self, ns: str, name: str) -> list[dict]:
+        return self._dep if self._dep is not None else []
 
 
 def _pod_with_rs(name: str, rs: str) -> dict:
@@ -567,19 +567,19 @@ def _pod_with_rs(name: str, rs: str) -> dict:
 
 def test_candidate_count_full_chain() -> None:
     client = _FakeAdminClient(
-        _pod_with_rs("kubedash-abc12", "kubedash-abc12-def34"),
-        {"spec": {"replicas": 3}},
+        [_pod_with_rs("kubedash-abc12", "kubedash-abc12-def34")],
+        [{"spec": {"replicas": 3}}],
     )
     assert ha_status._candidate_count(client, "kubedash-abc12") == 3
 
 
 def test_candidate_count_pod_missing() -> None:
-    client = _FakeAdminClient(None, {"spec": {"replicas": 3}})
+    client = _FakeAdminClient([], [{"spec": {"replicas": 3}}])
     assert ha_status._candidate_count(client, "x") is None
 
 
 def test_candidate_count_no_replicaset_owner() -> None:
-    pod = {"metadata": {"name": "x", "ownerReferences": [{"kind": "Job", "name": "j"}]}}
+    pod = [{"metadata": {"name": "x", "ownerReferences": [{"kind": "Job", "name": "j"}]}}]
     assert ha_status._candidate_count(_FakeAdminClient(pod, None), "x") is None
 
 
@@ -592,7 +592,7 @@ def test_candidate_count_transport_failure_is_none() -> None:
 
 
 def test_candidate_count_null_replica_id() -> None:
-    assert ha_status._candidate_count(_FakeAdminClient(_pod_with_rs("a", "a-b"), None), "?") is None
+    assert ha_status._candidate_count(_FakeAdminClient([_pod_with_rs("a", "a-b")], None), "?") is None
     assert ha_status._candidate_count(None, "x") is None
 
 

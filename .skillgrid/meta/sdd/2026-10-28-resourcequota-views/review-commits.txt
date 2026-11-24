@@ -1,0 +1,20 @@
+ backend/app/api/resources.py                       |   5 +
+ backend/app/services/k8s_client.py                 |  30 ++++
+ backend/tests/api/test_resources.py                | 157 +++++++++++++++++++++
+ .../services/test_k8s_client_resourcequotas.py     |  88 ++++++++++++
+ 4 files changed, 280 insertions(+)
+
+ frontend/src/lib/types.ts                          |  21 ++
+ frontend/src/views/OtherResource/ResourceQuota.tsx | 132 ++++++++++
+ frontend/tests/views/resource_quotas.test.tsx      | 279 +++++++++++++++++++++
+ 3 files changed, 432 insertions(+)
+
+ .../src/views/OtherResource/ResourceQuotaData.tsx  | 213 +++++++++++++++++++++
+ frontend/tests/views/resource_quota_data.test.tsx  | 208 ++++++++++++++++++++
+ 2 files changed, 421 insertions(+)
+
+ frontend/src/App.tsx               | 18 ++++++++++++++++++
+ frontend/src/views/Stub/routes.ts  |  1 -
+ frontend/tests/views/Stub.test.tsx |  5 +++++
+ 3 files changed, 23 insertions(+), 1 deletion(-)
+

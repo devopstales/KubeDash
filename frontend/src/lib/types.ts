@@ -53,11 +53,18 @@ export interface Health {
   status: string
 }
 
-/** A Pod item as returned by /api/v1/clusters/<id>/resources/pods. */
+/** A Pod item as returned by /api/v1/clusters/<id>/resources/pods.
+ *  kubernetes to_dict shape: snake_case (a generated core/v1 model). */
 export interface Pod {
   metadata?: {
     name?: string
     namespace?: string
+    creation_timestamp?: string
+    /** kubernetes to_dict, snake_case — set while the pod is being
+     *  deleted (the list's effective-phase rule: Terminated). */
+    deletion_timestamp?: string | null
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
     /** kubernetes to_dict, snake_case — the Service data page's Pods tab
      *  renders the first entry as `kind.lower() + "/" + name`. */
     owner_references?: { kind?: string; name?: string }[]
@@ -67,6 +74,23 @@ export interface Pod {
     /** kubernetes to_dict, snake_case — the pod's assigned node (absent
      *  when unscheduled). */
     node_name?: string
+    priority?: number
+    priority_class_name?: string
+    runtime_class_name?: string
+    service_account_name?: string
+    security_context?: Record<string, unknown>
+    containers?: {
+      name?: string
+      image?: string
+      env?: { name?: string; value?: string; value_from?: { secret_key_ref?: { name?: string } } }[]
+    }[]
+    init_containers?: { name?: string; image?: string }[]
+    volumes?: {
+      persistent_volume_claim?: { claim_name?: string }
+      config_map?: { name?: string }
+      secret?: { secret_name?: string }
+    }[]
+    image_pull_secrets?: { name?: string }[]
     [key: string]: unknown
   }
   status?: {
@@ -74,6 +98,70 @@ export interface Pod {
     /** kubernetes to_dict, snake_case — the pod IP (absent when not yet
      *  assigned). */
     pod_ip?: string
+    conditions?: { type?: string; status?: string; reason?: string; message?: string }[]
+    container_statuses?: {
+      name?: string
+      ready?: boolean
+      restart_count?: number
+      state?: Record<string, unknown>
+      last_state?: Record<string, unknown>
+    }[]
+    init_container_statuses?: {
+      name?: string
+      ready?: boolean
+      restart_count?: number
+      state?: Record<string, unknown>
+    }[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/** A Deployment item as returned by /api/v1/clusters/<id>/resources/deployments.
+ *  kubernetes to_dict shape: snake_case (a generated apps/v1 model). */
+export interface DeploymentItem {
+  metadata?: {
+    name?: string
+    namespace?: string
+    creation_timestamp?: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
+    [key: string]: unknown
+  }
+  spec?: {
+    replicas?: number
+    selector?: { match_labels?: Record<string, string> }
+    template?: {
+      spec?: {
+        service_account_name?: string
+        security_context?: Record<string, unknown>
+        containers?: {
+          name?: string
+          image?: string
+          env?: { name?: string; value?: string; value_from?: { secret_key_ref?: { name?: string } } }[]
+        }[]
+        init_containers?: { name?: string; image?: string }[]
+        volumes?: {
+          persistent_volume_claim?: { claim_name?: string }
+          config_map?: { name?: string }
+          secret?: { secret_name?: string }
+        }[]
+        image_pull_secrets?: { name?: string }[]
+        [key: string]: unknown
+      }
+    }
+    [key: string]: unknown
+  }
+  status?: {
+    replicas?: number
+    ready_replicas?: number
+    updated_replicas?: number
+    conditions?: {
+      type?: string
+      reason?: string
+      message?: string
+      last_transition_time?: string
+    }[]
     [key: string]: unknown
   }
   [key: string]: unknown

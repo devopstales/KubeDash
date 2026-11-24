@@ -32,8 +32,6 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/dashboard/workload-map', title: 'Workload' },
   { path: '/cluster/node', title: 'Nodes' },
   { path: '/cluster/crd', title: 'CRDs' },
-  { path: '/workload/pods', title: 'Pods' },
-  { path: '/workload/deployments', title: 'Deployments' },
   { path: '/workload/statefulsets', title: 'StatefulSets' },
   { path: '/workload/daemonsets', title: 'DaemonSets' },
   { path: '/workload/replicasets', title: 'ReplicaSets' },
@@ -59,6 +57,15 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   // title is the view's card title (the sidebar label 'VPAs' cannot satisfy
   // an exact match, so this pins the route registration).
   { path: '/other-resource/vertical-pod-autoscaler', title: 'Vertical Pod Autoscaler List' },
+  // Pod (2026-10-28-pods-deployments-views): real view, kept in this sweep
+  // for the title assertion (same rationale as the real-view entries
+  // above) — the view's docstring cites this e2e assertion. The title is
+  // the view's card title (the sidebar label 'Pods' cannot satisfy an
+  // exact match, so this pins the route registration).
+  { path: '/workload/pods', title: 'Pod List' },
+  // Deployment (2026-10-28-pods-deployments-views): same rationale as the
+  // Pod entry above.
+  { path: '/workload/deployments', title: 'Deployments List' },
   // PodDisruptionBudget (2026-10-28-pdb-views): real view, kept in this
   // sweep for the title assertion (same rationale as the stale-real-view
   // entries above) — the view's docstring cites this e2e assertion. The
@@ -80,6 +87,12 @@ const SMOKE_STUB_ROUTES: Array<{ path: string; title: string }> = [
   // sweep for the title assertion (same rationale as the stale-real-view
   // entries above) — the view's docstring cites this e2e assertion.
   { path: '/other-resource/runtimeclass', title: 'Runtime Classes' },
+  // LimitRange (2026-10-28-limitrange-views): real view, kept in this
+  // sweep for the title assertion (same rationale as the stale-real-view
+  // entries above) — the view's docstring cites this e2e assertion. The
+  // title is the view's card title (the sidebar label 'Limit Range'
+  // cannot satisfy an exact match, so this pins the route registration).
+  { path: '/other-resource/limit-range', title: 'Limit Ranges' },
   // Admin-gated stubs (render for the bootstrap admin):
   { path: '/settings/sso-config', title: 'Auth Provider' },
 ]
@@ -119,6 +132,10 @@ const REAL_ROUTES = [
   '/storage/pv',
   // Limit Range (2026-10-28-limitrange-views): real views, not stubs.
   '/other-resource/limit-range',
+  // Pods (2026-10-28-pods-deployments-views): real views, not stubs.
+  '/workload/pods',
+  // Deployments (2026-10-28-pods-deployments-views): real views, not stubs.
+  '/workload/deployments',
   // Cluster dashboard (2026-10-21-cluster-dashboard): without a selected
   // cluster it renders "No cluster selected." — the mount check below covers
   // both states (no JS crash either way).
